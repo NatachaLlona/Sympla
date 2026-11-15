@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sympla API — Swagger</title>
+  <link rel="stylesheet" href="{% url 'swagger-asset' filename='swagger-ui.css' %}">
+</head>
+<body>
+  <div id="swagger-ui"></div>
+  <script src="{% url 'swagger-asset' filename='swagger-ui-bundle.js' %}"></script>
+  <script nonce="{{ nonce }}">
+    SwaggerUIBundle({
+      url: "{% url 'openapi-schema' %}",
+      dom_id: '#swagger-ui',
+      deepLinking: true,
+      persistAuthorization: false,
+      validatorUrl: null,
+      supportedSubmitMethods: ['get', 'post', 'patch', 'delete'],
+      withCredentials: false
+    });
+  </script>
+</body>
+</html>

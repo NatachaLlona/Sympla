@@ -39,6 +39,7 @@ if os.getenv('DJANGO_TRUST_PROXY', 'false').lower() == 'true':
     # Only enable behind a trusted proxy that strips untrusted forwarding headers.
     SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 DATA_UPLOAD_MAX_MEMORY_SIZE = 4096
+DOCS_ENABLED = os.getenv('DJANGO_DOCS_ENABLED', 'true').lower() == 'true'
 PASSWORD_HASHERS = [
     'django.contrib.auth.hashers.PBKDF2PasswordHasher',
     'django.contrib.auth.hashers.PBKDF2SHA1PasswordHasher',

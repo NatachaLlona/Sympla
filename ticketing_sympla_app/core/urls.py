@@ -1,7 +1,12 @@
 ﻿from django.urls import path
 from . import views
+from . import docs
 
 urlpatterns = [
+    path('docs/', docs.swagger, name='swagger'),
+    path('swagger/', docs.swagger),
+    path('openapi.json', docs.schema, name='openapi-schema'),
+    path('docs/assets/<str:filename>', docs.asset, name='swagger-asset'),
     path('ping/', views.ping),
     path('api/v1/schedules/', views.schedules),
     path('api/v1/schedules/<int:schedule_id>/', views.schedule_detail),

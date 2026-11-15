@@ -5,6 +5,23 @@ creates a new version only when documented event data changes, and records audit
 
 ## API
 
+Interactive Swagger: `/docs/` (also `/swagger/`). OpenAPI JSON: `/openapi.json`.
+Click **Authorize** and paste only the API user's token: Swagger adds `Bearer` automatically.
+The UI uses same-origin bundled assets, disables external validation and does not persist tokens
+across page reloads. Documentation is public; protected routes still require authentication.
+Set `DJANGO_DOCS_ENABLED=false` to disable the UI, schema and assets.
+
+Local development instance: http://127.0.0.1:8010/docs/ . To obtain a token,
+from the repository root run:
+
+```powershell
+.\.venv\Scripts\python.exe ticketing_sympla_app/manage.py api_user create integration --write
+```
+
+If the username already exists, use `api_user rotate integration`. There is no default password,
+password-login route or JWT: the operator provisions a high-entropy opaque API-user token.
+The Sympla provider token is a separate server-side credential. A worker must be running for sync jobs.
+
 All `/api/v1/` routes require `Authorization: Bearer <API_USER_TOKEN>`.
 API user tokens are separate from the Sympla token. Read-only users cannot change schedules or trigger sync.
 

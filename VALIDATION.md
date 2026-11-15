@@ -2,6 +2,10 @@
 
 The original review in ANALISE.md describes the imported prototype, not the current implementation.
 
+Swagger addition: the OpenAPI 3.0.3 document passed openapi-spec-validator. Tests cover the public
+documentation page, local allowlisted JS/CSS assets, disabling documentation, Bearer configuration,
+and schema paths resolving to real routes. Public documentation does not authorize API operations.
+
 Implemented: recurring daily schedules with explicit IANA timezone; active/inactive state and soft deletion;
 manual sync queue; persistent jobs; atomic current-event updates, snapshots and field differences;
 append-only audit and API request history; operator-provisioned/revocable bearer API users.
