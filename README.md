@@ -164,3 +164,33 @@ not a hard process deadline. Safe error codes replace upstream bodies and traceb
 to event text and sanitize HTML before rendering it in another UI.
 
 See VALIDATION.md. A real authorized Sympla staging import remains required before production.
+## Troubleshooting imports and logs
+
+A 202 response with status queued means only that a job was accepted, not that events were imported.
+The manual response includes status_url. Follow GET /api/v1/sync-runs/{run_id}/ until status becomes
+success or failed. GET /api/v1/sync-runs/ lists all scheduled and manual runs. Failures include
+error_code and error_details with an English message and, for upstream HTTP errors, the status/page.
+Upstream bodies, authorization headers and pagination cursors are never included in these diagnostics.
+
+If the provider token is missing, manual sync returns 503 with a setup instruction before queuing.
+Run python start.py --configure-sympla to enter the token securely and reload the API/worker.
+Reconfigure only after active imports finish. The Sympla token is separate from your API client secret.
+
+From the workspace root:
+
+```powershell
+python start.py --logs
+```
+
+Direct Docker commands are also available:
+
+```powershell
+docker logs --tail 100 -f sympla-worker-1
+docker logs --tail 100 -f sympla-api-1
+```
+
+GET /api/v1/audit-logs/ contains persisted business changes and failures. GET /api/v1/request-logs/
+contains HTTP access records. These tables remain in PostgreSQL when containers restart; Docker's
+stdout logs belong to the container and may be replaced when containers are recreated.
+Sympla cursor pagination permits terminal pages containing only quantity and page_size: no next_cursor
+means there is no next page. The importer supports that response even for a single-page/empty result.

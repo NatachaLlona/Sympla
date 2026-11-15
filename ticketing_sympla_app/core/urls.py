@@ -14,6 +14,7 @@ urlpatterns = [
     path('api/v1/schedules/<int:schedule_id>/', views.schedule_detail),
     path('api/v1/sync/', views.sync_now),
     path('api/v1/sync-runs/', views.runs),
+    path('api/v1/sync-runs/<uuid:run_id>/', views.run_detail),
     path('api/v1/events/', views.events),
     path('api/v1/events/<int:event_id>/versions/', views.versions),
     path('api/v1/audit-logs/', views.audit_logs),

@@ -6,17 +6,32 @@ from django.conf import settings
 
 
 class SyncError(Exception):
-    pass
+    def __init__(self, code, *, http_status=None, page=None):
+        super().__init__(code)
+        self.details = {}
+        if http_status is not None:
+            self.details['upstream_http_status'] = http_status
+        if page is not None:
+            self.details['page'] = page
+
+
+def configuration_error():
+    base = settings.SYMPLA_API_HOST.rstrip('/')
+    try:
+        parsed = urlsplit(base)
+        invalid = (parsed.scheme != 'https' or parsed.hostname != 'api.sympla.com.br'
+                   or parsed.port not in (None, 443) or parsed.username or parsed.password
+                   or parsed.query or parsed.fragment or not settings.SYMPLA_API_KEY)
+    except ValueError:
+        invalid = True
+    return 'upstream_configuration' if invalid else None
 
 
 def fetch_events():
     """Bounded HTTPS fetch; never log credentials or upstream error bodies."""
-    base = settings.SYMPLA_API_HOST.rstrip('/')
-    parsed = urlsplit(base)
-    if (parsed.scheme != 'https' or parsed.hostname != 'api.sympla.com.br'
-            or parsed.port not in (None, 443) or parsed.username or parsed.password
-            or parsed.query or parsed.fragment or not settings.SYMPLA_API_KEY):
+    if configuration_error():
         raise SyncError('upstream_configuration')
+    base = settings.SYMPLA_API_HOST.rstrip('/')
     deadline = time.monotonic() + settings.SYNC_TIMEOUT_SECONDS
     events, seen, cursors = [], set(), set()
     total_bytes = 0
@@ -34,7 +49,7 @@ def fetch_events():
                                  params=params, timeout=(min(5, remaining), min(10, remaining)),
                                  allow_redirects=False, stream=True) as response:
                     if response.status_code != 200:
-                        raise SyncError('upstream_http_error')
+                        raise SyncError('upstream_http_error', http_status=response.status_code, page=page)
                     chunks, size = [], 0
                     for chunk in response.iter_content(8192):
                         size += len(chunk)
@@ -44,6 +59,10 @@ def fetch_events():
                             raise SyncError('upstream_limit')
                         chunks.append(chunk)
                     data = json.loads(b''.join(chunks))
+            except requests.Timeout as exc:
+                raise SyncError('upstream_timeout', page=page) from exc
+            except requests.ConnectionError as exc:
+                raise SyncError('upstream_connection_error', page=page) from exc
             except (requests.RequestException, ValueError) as exc:
                 raise SyncError('upstream_invalid_response') from exc
             if not isinstance(data, dict) or not isinstance(data.get('data'), list):
@@ -73,6 +92,14 @@ def fetch_events():
             if cursor or 'next_cursor' in pagination:
                 return events
             has_next = pagination.get('has_next')
+            if 'has_next' not in pagination:
+                # Sympla's cursor contract omits next_cursor on the terminal page,
+                # including a single-page result. quantity is the current batch count.
+                quantity, size = pagination.get('quantity'), pagination.get('page_size')
+                if (type(quantity) is int and quantity == len(batch) and type(size) is int
+                        and size > 0 and len(batch) <= size):
+                    return events
+                raise SyncError('upstream_invalid_pagination')
             if not isinstance(has_next, bool):
                 raise SyncError('upstream_invalid_pagination')
             if not has_next:

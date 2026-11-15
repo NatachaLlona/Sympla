@@ -141,7 +141,8 @@ SCHEMAS = {
         ["id", "time", "timezone", "active", "next_run_at", "created_at", "created_by"],
     ),
     "QueuedRun": obj(
-        {"id": text(format="uuid"), "status": text(enum=["queued"])}, ["id", "status"]
+        {"id": text(format="uuid"), "status": text(enum=["queued"]),
+         "status_url": text(), "message": text()}, ["id", "status", "status_url"]
     ),
     "SyncRun": obj(
         {
@@ -157,6 +158,7 @@ SCHEMAS = {
             "started_at": NULL_DATETIME,
             "finished_at": NULL_DATETIME,
             "error_code": text(),
+            "error_details": JSON_OBJECT,
             "counts": JSON_OBJECT,
         }
     ),
@@ -409,3 +411,9 @@ PATHS["/api/v1/token/"] = {
         },
     }
 }
+
+PATHS['/api/v1/sync-runs/{run_id}/'] = {'get': operation(
+    'getSyncRun', 'Read a synchronization result and diagnostic details', 'Synchronization', ref('SyncRun'),
+    parameters=[{'name': 'run_id', 'in': 'path', 'required': True, 'schema': text(format='uuid')}])}
+PATHS['/api/v1/sync-runs/{run_id}/']['get']['responses']['404'] = response('Run not found', ref('Error'))
+PATHS['/api/v1/sync/']['post']['responses']['503'] = response('Sympla credentials or host are not configured', ref('Error'))

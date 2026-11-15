@@ -38,3 +38,14 @@ Simpla database/port 2424 or normal client credentials. CI runs both the suite a
 Build contexts exclude .env files, SQLite files, .local secrets, QA state and Git metadata.
 Limitations: no live provider smoke test, load test or infrastructure pentest. Remote deployment
 requires an explicit HTTPS/reverse-proxy/database security setup.
+
+Import troubleshooting regression: missing provider configuration now returns actionable 503 before
+manual queuing; run responses link to a detail endpoint. Safe diagnostics retain HTTP status/page and
+English failure messages without response bodies or cursors. Tests cover Sympla terminal pages that
+omit next_cursor/has_next for empty, short and exactly-full batches.
+
+Live verification after the import fix: an authorized account read returned HTTP 200 and three events.
+The normal Docker worker successfully processed scheduled imports and a manual import; three events
+and three initial versions were persisted. Repeated reads reported three unchanged events and did not
+create duplicate versions. Earlier failures remain in the execution/audit history. Automated QA still
+uses only mocks or disposable infrastructure. Regression suite: 39 tests passed on Python 3.13/PostgreSQL.

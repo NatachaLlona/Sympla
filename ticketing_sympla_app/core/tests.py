@@ -16,6 +16,7 @@ from .services import enqueue, enqueue_due, process_one, claim_run, persist_even
 from .sympla import fetch_events, SyncError
 
 
+@override_settings(SYMPLA_API_KEY='test-placeholder-not-real')
 class ApiTests(TestCase):
     def setUp(self):
         self.token = 'test-token-that-is-never-a-real-credential'
@@ -65,6 +66,22 @@ class ApiTests(TestCase):
         self.assertEqual(self.post('/api/v1/sync/', {}).status_code, 409)
         self.assertEqual(SyncRun.objects.get().source, 'manual')
         self.assertEqual(self.client.get('/api/v1/sync-runs/', **self.headers).json()['count'], 1)
+
+    @override_settings(SYMPLA_API_KEY='')
+    def test_missing_provider_token_returns_actionable_error_without_queuing(self):
+        result = self.post('/api/v1/sync/', {})
+        self.assertEqual(result.status_code, 503)
+        self.assertEqual(result.json()['error'], 'upstream_configuration')
+        self.assertIn('--configure-sympla', result.json()['message'])
+        self.assertFalse(SyncRun.objects.exists())
+
+    def test_manual_response_links_to_execution_status(self):
+        result = self.post('/api/v1/sync/', {})
+        response = self.client.get(result.json()['status_url'], **self.headers)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()['id'], result.json()['id'])
+        self.assertEqual(response.json()['status'], 'queued')
+        self.assertIn('error_details', response.json())
 
     def test_schedule_delete_cancels_only_queued(self):
         result = self.post('/api/v1/schedules/', {'time': '09:30', 'timezone': 'UTC'})
@@ -156,6 +173,7 @@ class SyncTests(TestCase):
         self.queue()
         run = process_one()
         self.assertEqual(run.status, 'failed')
+        self.assertTrue(run.error_details['message'])
         self.assertFalse(Event.objects.exists())
         self.assertFalse(EventVersion.objects.exists())
         self.assertFalse(AuditLog.objects.filter(resource='event').exists())
@@ -227,6 +245,21 @@ class FetchTests(TestCase):
                                   self.response({'data': [{'id': '2'}], 'pagination': {'next_cursor': None}})]
         self.assertEqual(len(fetch_events()), 2)
         self.assertEqual(client.get.call_args.kwargs['params']['cursor'], 'next')
+
+    @patch('core.sympla.requests.Session')
+    def test_terminal_page_can_omit_cursor_and_has_next(self, session):
+        client = session.return_value.__enter__.return_value
+        for batch, size in [([{'id': '1'}, {'id': '2'}, {'id': '3'}], 200), ([], 200), ([{'id': '1'}], 1)]:
+            client.get.return_value = self.response({'data': batch, 'pagination': {'quantity': len(batch), 'page_size': size}})
+            self.assertEqual(fetch_events(), batch)
+
+    @patch('core.sympla.requests.Session')
+    def test_http_error_preserves_only_safe_status_and_page(self, session):
+        session.return_value.__enter__.return_value.get.return_value = self.response({'secret': 'never-log'}, 401)
+        with self.assertRaises(SyncError) as error:
+            fetch_events()
+        self.assertEqual(error.exception.details, {'upstream_http_status': 401, 'page': 1})
+        self.assertNotIn('never-log', str(error.exception))
 
     @patch('core.sympla.requests.Session')
     def test_invalid_pagination_redirect_and_duplicates(self, session):

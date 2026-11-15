@@ -2,6 +2,7 @@
 
 import importlib.util
 import json
+import subprocess
 from pathlib import Path
 import time
 from unittest.mock import patch
@@ -74,7 +75,17 @@ def main():
             token,
         )
     )
-    run = request("/api/v1/sync/", {}, token)
+    try:
+        request('/api/v1/sync/', {}, token)
+        raise AssertionError('Missing Sympla credentials should be rejected before queuing')
+    except HTTPError as exc:
+        assert exc.code == 503
+        assert json.load(exc)['error'] == 'upstream_configuration'
+    # Scheduled/operator-created jobs still exercise the worker's safe configuration failure.
+    code = "from django.db import transaction; from core.services import enqueue\nwith transaction.atomic():\n run=enqueue('qa-operator')\n print(run.pk)"
+    identifier = subprocess.check_output(['docker', 'exec', 'sympla-startup-qa-api-1',
+        'python', 'manage.py', 'shell', '-c', code], text=True).strip().splitlines()[-1]
+    run = {'id': identifier}
     for _ in range(20):
         runs = request("/api/v1/sync-runs/", token=token)["results"]
         item = next(item for item in runs if item["id"] == run["id"])

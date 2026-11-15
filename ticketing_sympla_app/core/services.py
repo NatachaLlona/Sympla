@@ -1,11 +1,15 @@
 import hashlib
 import json
 import uuid
+import logging
 from django.db import transaction, IntegrityError
 from django.utils import timezone
 from .models import Schedule, SyncRun, Event, EventVersion, AuditLog, Coordinator
 from .scheduling import next_occurrence
 from .sympla import fetch_events, SyncError
+from .sync_errors import message
+
+logger = logging.getLogger(__name__)
 
 
 def audit(actor, action, resource, target, differences=None, interaction=None, outcome='committed'):
@@ -137,7 +141,10 @@ def process_one():
             current = SyncRun.objects.select_for_update().get(pk=run.pk)
             current.status, current.running_slot = 'failed', None
             current.finished_at, current.error_code = timezone.now(), code
+            current.error_details = {'message': message(code), **(exc.details if isinstance(exc, SyncError) else {})}
             current.save()
             audit(current.actor, 'sync.failed', 'sync_run', run.pk,
-                  {'error_code': code}, interaction=run.pk, outcome='rolled_back')
+                  {'error_code': code, **current.error_details}, interaction=run.pk, outcome='rolled_back')
+        logger.error('Synchronization failed: run_id=%s error_code=%s details=%s',
+                     run.pk, code, current.error_details)
     return SyncRun.objects.get(pk=run.pk)

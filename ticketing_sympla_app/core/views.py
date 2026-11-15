@@ -10,6 +10,8 @@ from .auth import api_endpoint
 from .models import Schedule, SyncRun, Event, EventVersion, AuditLog, ApiRequestLog, Coordinator
 from .scheduling import next_occurrence
 from .services import audit, enqueue
+from .sympla import configuration_error
+from .sync_errors import message
 
 
 @require_GET
@@ -131,17 +133,33 @@ def sync_now(request):
         body(request, set())
     except (ValueError, TypeError):
         return JsonResponse({'error': 'expected_empty_json_object'}, status=400)
+    error = configuration_error()
+    if error:
+        return JsonResponse({'error': error, 'message': message(error)}, status=503)
     if SyncRun.objects.filter(source='manual', status__in=['queued', 'running']).exists():
         return JsonResponse({'error': 'sync_pending'}, status=409)
     run = enqueue(request.api_user.username, interaction=request.interaction_id)
-    return JsonResponse({'id': str(run.pk), 'status': run.status}, status=202)
+    return JsonResponse({'id': str(run.pk), 'status': run.status,
+        'status_url': f'/api/v1/sync-runs/{run.pk}/',
+        'message': 'Synchronization queued. Check status_url for the result; events are available after success.'}, status=202)
 
 
 @api_endpoint(['GET'])
 def runs(request):
     return page(request, SyncRun.objects.order_by('-created_at'),
         ['id', 'source', 'actor', 'schedule_id', 'scheduled_for', 'status', 'created_at',
-         'started_at', 'finished_at', 'error_code', 'counts'])
+         'started_at', 'finished_at', 'error_code', 'error_details', 'counts'])
+
+
+@api_endpoint(['GET'])
+def run_detail(request, run_id):
+    run = SyncRun.objects.filter(pk=run_id).values('id', 'source', 'actor', 'schedule_id',
+        'scheduled_for', 'status', 'created_at', 'started_at', 'finished_at', 'error_code', 'error_details', 'counts').first()
+    if not run:
+        return JsonResponse({'error': 'not_found'}, status=404)
+    if run['error_code'] and not run['error_details']:
+        run['error_details'] = {'message': message(run['error_code'])}
+    return JsonResponse(run)
 
 
 @api_endpoint(['GET'])

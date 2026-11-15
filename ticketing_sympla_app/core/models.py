@@ -56,6 +56,7 @@ class SyncRun(models.Model):
     started_at = models.DateTimeField(null=True)
     finished_at = models.DateTimeField(null=True)
     error_code = models.CharField(max_length=50, blank=True)
+    error_details = models.JSONField(default=dict)
     counts = models.JSONField(default=dict)
     running_slot = models.PositiveSmallIntegerField(null=True, unique=True)
 

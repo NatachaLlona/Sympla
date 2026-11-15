@@ -22,7 +22,8 @@ class DocumentationTests(SimpleTestCase):
         self.assertEqual(spec['paths']['/api/v1/token/']['post']['security'], [])
         self.assertEqual(spec['paths']['/ping/']['get']['security'], [])
         for path in spec['paths']:
-            actual_path = path.replace('{schedule_id}', '1').replace('{event_id}', '1')
+            actual_path = path.replace('{schedule_id}', '1').replace('{event_id}', '1').replace(
+                '{run_id}', '00000000-0000-0000-0000-000000000001')
             self.assertIsNotNone(resolve(actual_path))
         self.assertEqual(spec['paths']['/api/v1/sync/']['post']['requestBody']
                          ['content']['application/json']['example'], {})

@@ -216,6 +216,8 @@ def main(argv=None):
         action="store_true",
         help="Set a new client secret and revoke existing tokens",
     )
+    actions.add_argument('--configure-sympla', action='store_true',
+                         help='Configure the Sympla provider token without changing API client credentials')
     args = parser.parse_args(argv)
     try:
         config = load_config(args.config)
@@ -246,7 +248,7 @@ def main(argv=None):
                 "Database name/project changed after initialization. Existing data will not be "
                 "renamed or deleted automatically. Restore the configuration or plan a data migration."
             )
-        if not state and (args.stop or args.logs):
+        if not state and (args.stop or args.logs or args.configure_sympla):
             raise StartupError(
                 "The Docker stack has not been configured yet. Run python start.py first."
             )
@@ -312,6 +314,12 @@ def main(argv=None):
             write_file(state_dir / "client_secret", client_secret)
             state.update(client_id=client_id, client_setup_pending=True)
             write_file(state_path, json.dumps(state, indent=2))
+        elif args.configure_sympla:
+            token = getpass.getpass('Sympla API token: ').strip()
+            if not token:
+                raise StartupError('Sympla API token must not be empty. The existing token was not changed.')
+            write_file(state_dir / 'sympla_api_key', token)
+            print('Sympla provider token saved. The API and worker will reload it.')
         env = compose_environment(config, state_dir, state)
         if args.stop:
             run(base + ["stop"], env)
@@ -320,6 +328,9 @@ def main(argv=None):
         if args.logs:
             run(base + ["logs", "--follow", "api", "worker"], env)
             return 0
+        if not (state_dir / 'sympla_api_key').read_text(encoding='utf-8').strip():
+            print('Warning: Sympla imports are disabled because the provider token is missing. '
+                  'Run python start.py --configure-sympla.')
         print("Building the application and starting PostgreSQL...")
         run(base + ["build", "api"], env)
         run(base + ["up", "--detach", "--wait", "db"], env)
@@ -328,7 +339,10 @@ def main(argv=None):
         write_file(state_dir / "client_secret", "")
         state["client_setup_pending"] = False
         write_file(state_path, json.dumps(state, indent=2))
-        run(base + ["up", "--detach", "--wait", "api", "worker"], env)
+        app_up = ['up', '--detach', '--wait']
+        if args.configure_sympla:
+            app_up.append('--force-recreate')
+        run(base + app_up + ['api', 'worker'], env)
         print(f"Ready. Swagger: http://127.0.0.1:{config['api']['port']}/docs/")
         print(
             f"Client ID: {state['client_id']}. Use your client secret in Swagger Authorize."
