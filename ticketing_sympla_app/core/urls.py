@@ -1,8 +1,10 @@
 ﻿from django.urls import path
 from . import views
 from . import docs
+from .token_views import token
 
 urlpatterns = [
+    path('api/v1/token/', token, name='api-token'),
     path('docs/', docs.swagger, name='swagger'),
     path('swagger/', docs.swagger),
     path('openapi.json', docs.schema, name='openapi-schema'),

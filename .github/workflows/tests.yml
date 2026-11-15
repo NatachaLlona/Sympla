@@ -31,3 +31,4 @@ jobs:
         env:
           TEST_POSTGRES_HOST: 127.0.0.1
           TEST_POSTGRES_PORT: '5432'
+      - run: python qa/verify_docker_startup.py

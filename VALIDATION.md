@@ -1,53 +1,40 @@
 ﻿# Validation
 
-The original review in ANALISE.md describes the imported prototype, not the current implementation.
+The application is started with start.py, running PostgreSQL, API and worker in Docker.
+ANALISE.md describes the imported prototype and is historical.
 
-Swagger addition: the OpenAPI 3.0.3 document passed openapi-spec-validator. Tests cover the public
-documentation page, local allowlisted JS/CSS assets, disabling documentation, Bearer configuration,
-and schema paths resolving to real routes. Public documentation does not authorize API operations.
+Tests cover schedules, read/write permissions, token issuance with JSON/form/HTTP Basic, expiration,
+rotation/revocation, rate limiting, legacy-token rejection, password rules, immutable history,
+transaction rollback, event versions, worker integration, pagination, DST, concurrent workers/schedulers,
+Swagger/OpenAPI and JSONC configuration. OpenAPI 3.0.3 passed openapi-spec-validator.
 
-Implemented: recurring daily schedules with explicit IANA timezone; active/inactive state and soft deletion;
-manual sync queue; persistent jobs; atomic current-event updates, snapshots and field differences;
-append-only audit and API request history; operator-provisioned/revocable bearer API users.
+Final result: all 35 tests passed with Python 3.13 and PostgreSQL 17. SQLite passed 33 and skipped
+the two PostgreSQL-only concurrency checks. The complete Docker launcher test also passed,
+including restart persistence and client-secret rotation with invalidation of old tokens.
 
-Final validation passed with Python 3.13 in an isolated Docker image and Django 5.2.19:
-23 tests passed on PostgreSQL 17; SQLite passed 21 tests and skipped two PostgreSQL-only concurrency tests.
-Initial local checks also used Python 3.15.0; the final supported-version runs supersede that limitation.
-PostgreSQL tests use a disposable PostgreSQL 17 container and mocked Sympla responses.
-No real API credentials or production records are used in tests.
-
-Run SQLite tests:
-
-```powershell
-$env:DJANGO_SECRET_KEY='isolated-test-key-at-least-fifty-characters-long-not-for-production'
-python ticketing_sympla_app/manage.py test core --settings=ticketing_sympla_app.test_settings
-```
-
-For PostgreSQL tests, provision a disposable local database named sympla_qa with user sympla_qa,
-password disposable-local-qa-only, port 55439. The test account needs permission to create/drop test databases.
-Set TEST_POSTGRES_HOST=127.0.0.1 and optionally TEST_POSTGRES_PORT. Django creates/drops test_sympla_qa.
-These fixed credentials are exclusively for a disposable isolated QA database and are not deployment credentials.
-
-Coverage includes: authorization, revocation, readonly access, schedule validation and deletion,
-manual queuing, absence of the unsafe legacy route, request log secret omission, transactional audit rollback,
-unchanged/changed events, nested differences, partial import rollback, failure preservation,
-scheduler idempotency and downtime coalescing, DST gap/fold behavior, append-only DB protection,
-cursor/page pagination, redirect rejection, duplicate detection, host restrictions and concurrent worker claims.
-Coverage also includes concurrent scheduler ticks, API-to-worker-to-version integration, token rotation,
-oversized input rejection, and manual queuing independent of scheduled work.
-
-Reproduce the Python 3.13 image (qa/Dockerfile is for tests, not a production web server):
+Runtime direct dependencies are pinned. Tests use Python 3.13 and Django 5.2.19 in Docker, with a
+disposable PostgreSQL 17 and mocked upstream responses. No live Sympla credentials or normal data are used.
 
 ```powershell
 docker build -f qa/Dockerfile -t sympla-sync-qa-tests .
 docker run --rm --env DJANGO_SECRET_KEY=isolated-test-key-at-least-fifty-characters-long-not-for-production sympla-sync-qa-tests
 ```
 
-Add `--env TEST_POSTGRES_HOST=host.docker.internal` for the disposable database above.
-Docker excludes secrets, SQLite databases, virtual environments and Git metadata from the build context.
+For PostgreSQL tests, add TEST_POSTGRES_HOST=host.docker.internal and TEST_POSTGRES_PORT=55439.
+The fixture expects disposable database/user sympla_qa and password disposable-local-qa-only, with
+permission to create/drop test databases. Django creates/drops test_sympla_qa. These fixture values
+must never be deployment credentials.
 
-Production deploy checks leave only HSTS subdomain/preload recommendations: these are intentionally
-not enabled until the deployment domain policy is known. Do not enable them blindly.
+The separate end-to-end command python qa/verify_docker_startup.py validates first-boot password
+retries in English, Docker build/health/migrations/client setup, real HTTP token exchange, stored
+schedules, worker job processing, restart persistence, credential rotation, revocation of old tokens,
+restricted DB role permissions, and shutdown without deleting data. An empty provider token ensures
+no live Sympla request: the test job ends with the expected upstream_configuration failure.
 
-Limitations: no live Sympla smoke test, load test, infrastructure penetration test or actual deployment.
-The worker must be supervised; interrupted running jobs require explicit recovery after workers stop.
+This owned QA stack uses project sympla-startup-qa, database port 25424, API port 18010 and .qa-local/.
+Its sample passwords belong exclusively to disposable QA infrastructure. It never targets the user's
+Simpla database/port 2424 or normal client credentials. CI runs both the suite and the launcher check.
+
+Build contexts exclude .env files, SQLite files, .local secrets, QA state and Git metadata.
+Limitations: no live provider smoke test, load test or infrastructure pentest. Remote deployment
+requires an explicit HTTPS/reverse-proxy/database security setup.

@@ -6,7 +6,7 @@ from django.core.exceptions import RequestDataTooBig
 from django.http import JsonResponse
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
-from .models import ApiUser, ApiRequestLog
+from .models import ApiUser, ApiRequestLog, AccessToken
 
 
 def api_endpoint(methods, write=False):
@@ -22,7 +22,10 @@ def api_endpoint(methods, write=False):
                 user = None
                 if header.startswith('Bearer ') and len(header) <= 256:
                     digest = hashlib.sha256(header[7:].encode()).hexdigest()
-                    user = ApiUser.objects.select_for_update().filter(token_hash=digest, is_active=True).first()
+                    token = AccessToken.objects.filter(token_hash=digest, expires_at__gt=timezone.now()).first()
+                    if token:
+                        user = ApiUser.objects.select_for_update().filter(pk=token.user_id, is_active=True,
+                            credential_version=token.credential_version).first()
                 if not user:
                     response = JsonResponse({'error': 'unauthorized'}, status=401)
                     response['WWW-Authenticate'] = 'Bearer'

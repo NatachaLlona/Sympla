@@ -16,8 +16,10 @@ class DocumentationTests(SimpleTestCase):
 
     def test_schema_routes_and_bearer_scheme(self):
         spec = self.client.get('/openapi.json').json()
-        self.assertEqual(spec['components']['securitySchemes']['ApiBearer']['scheme'], 'bearer')
-        self.assertEqual(spec['security'], [{'ApiBearer': []}])
+        self.assertEqual(spec['security'], [{'ClientCredentials': []}])
+        self.assertEqual(spec['components']['securitySchemes']['ClientCredentials']['flows']
+                         ['clientCredentials']['tokenUrl'], '/api/v1/token/')
+        self.assertEqual(spec['paths']['/api/v1/token/']['post']['security'], [])
         self.assertEqual(spec['paths']['/ping/']['get']['security'], [])
         for path in spec['paths']:
             actual_path = path.replace('{schedule_id}', '1').replace('{event_id}', '1')

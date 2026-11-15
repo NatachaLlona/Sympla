@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="pt-BR">
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -10,7 +10,7 @@
   <div id="swagger-ui"></div>
   <script src="{% url 'swagger-asset' filename='swagger-ui-bundle.js' %}"></script>
   <script nonce="{{ nonce }}">
-    SwaggerUIBundle({
+    const ui = SwaggerUIBundle({
       url: "{% url 'openapi-schema' %}",
       dom_id: '#swagger-ui',
       deepLinking: true,
@@ -19,6 +19,7 @@
       supportedSubmitMethods: ['get', 'post', 'patch', 'delete'],
       withCredentials: false
     });
+    ui.initOAuth({useBasicAuthenticationWithAccessCodeGrant: false});
   </script>
 </body>
 </html>

@@ -9,7 +9,8 @@ from django.core.management import call_command
 from io import StringIO
 from django.test import TestCase, TransactionTestCase, override_settings
 from django.utils import timezone
-from .models import ApiUser, Schedule, SyncRun, Event, EventVersion, AuditLog, ApiRequestLog, Coordinator
+from django.contrib.auth.hashers import make_password
+from .models import ApiUser, AccessToken, Schedule, SyncRun, Event, EventVersion, AuditLog, ApiRequestLog, Coordinator
 from .scheduling import next_occurrence
 from .services import enqueue, enqueue_due, process_one, claim_run, persist_events
 from .sympla import fetch_events, SyncError
@@ -19,7 +20,9 @@ class ApiTests(TestCase):
     def setUp(self):
         self.token = 'test-token-that-is-never-a-real-credential'
         self.user = ApiUser.objects.create(username='writer', can_write=True,
-            token_hash=hashlib.sha256(self.token.encode()).hexdigest())
+            client_secret_hash=make_password('Testing1!'))
+        AccessToken.objects.create(user=self.user, credential_version=self.user.credential_version,
+            expires_at=timezone.now() + timedelta(hours=1), token_hash=hashlib.sha256(self.token.encode()).hexdigest())
         self.headers = {'HTTP_AUTHORIZATION': 'Bearer ' + self.token}
 
     def post(self, path, data):
@@ -99,12 +102,15 @@ class ApiTests(TestCase):
 
     def test_user_rotation_and_revocation_commands(self):
         output = StringIO()
-        call_command('api_user', 'create', 'command-user', write=True, stdout=output)
-        original = output.getvalue().strip()
-        self.assertGreaterEqual(len(original), 60)
+        with patch('core.management.commands.api_user.getpass.getpass', return_value='Testing1!'):
+            call_command('api_user', 'create', 'command-user', write=True, stdout=output)
+        original = self.client.post('/api/v1/token/', {'grant_type': 'client_credentials',
+            'client_id': 'command-user', 'client_secret': 'Testing1!'}, content_type='application/json').json()['access_token']
         output = StringIO()
-        call_command('api_user', 'rotate', 'command-user', stdout=output)
-        replacement = output.getvalue().strip()
+        with patch('core.management.commands.api_user.getpass.getpass', return_value='Rotated1!'):
+            call_command('api_user', 'rotate', 'command-user', stdout=output)
+        replacement = self.client.post('/api/v1/token/', {'grant_type': 'client_credentials',
+            'client_id': 'command-user', 'client_secret': 'Rotated1!'}, content_type='application/json').json()['access_token']
         self.assertNotEqual(original, replacement)
         self.assertEqual(self.client.get('/api/v1/events/', HTTP_AUTHORIZATION='Bearer ' + original).status_code, 401)
         self.assertEqual(self.client.get('/api/v1/events/', HTTP_AUTHORIZATION='Bearer ' + replacement).status_code, 200)

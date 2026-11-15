@@ -10,10 +10,25 @@ class Coordinator(models.Model):
 
 class ApiUser(models.Model):
     username = models.CharField(max_length=100, unique=True)
-    token_hash = models.CharField(max_length=64, unique=True)
+    token_hash = models.CharField(max_length=64, unique=True, null=True)
+    client_secret_hash = models.CharField(max_length=256, blank=True)
+    credential_version = models.PositiveIntegerField(default=1)
     is_active = models.BooleanField(default=True)
     can_write = models.BooleanField(default=False)
     created_at = models.DateTimeField(default=django_timezone.now)
+
+
+class AccessToken(models.Model):
+    token_hash = models.CharField(max_length=64, unique=True)
+    user = models.ForeignKey(ApiUser, on_delete=models.CASCADE)
+    credential_version = models.PositiveIntegerField()
+    expires_at = models.DateTimeField(db_index=True)
+
+
+class TokenThrottle(models.Model):
+    key = models.CharField(max_length=64, unique=True)
+    window_started = models.DateTimeField()
+    attempts = models.PositiveIntegerField(default=0)
 
 
 class Schedule(models.Model):

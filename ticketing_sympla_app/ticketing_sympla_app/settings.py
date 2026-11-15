@@ -14,6 +14,11 @@ from pathlib import Path
 import os
 from dotenv import load_dotenv
 
+
+def secret(name, default=''):
+    path = os.getenv(name + '_FILE')
+    return Path(path).read_text(encoding='utf-8').strip() if path else os.getenv(name, default)
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(BASE_DIR / '.env')
@@ -23,16 +28,17 @@ load_dotenv(BASE_DIR / '.env')
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.environ['DJANGO_SECRET_KEY']
+SECRET_KEY = secret('DJANGO_SECRET_KEY')
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.getenv('DJANGO_DEBUG', 'false').lower() == 'true'
 
 ALLOWED_HOSTS = [host.strip() for host in os.getenv('DJANGO_ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',') if host.strip()]
-SECURE_SSL_REDIRECT = not DEBUG
-SESSION_COOKIE_SECURE = not DEBUG
-CSRF_COOKIE_SECURE = not DEBUG
-SECURE_HSTS_SECONDS = 31536000 if not DEBUG else 0
+LOCAL_HTTP = os.getenv('DJANGO_LOCAL_HTTP', 'false').lower() == 'true'
+SECURE_SSL_REDIRECT = not DEBUG and not LOCAL_HTTP
+SESSION_COOKIE_SECURE = not DEBUG and not LOCAL_HTTP
+CSRF_COOKIE_SECURE = not DEBUG and not LOCAL_HTTP
+SECURE_HSTS_SECONDS = 31536000 if not DEBUG and not LOCAL_HTTP else 0
 SECURE_HSTS_INCLUDE_SUBDOMAINS = False
 SECURE_HSTS_PRELOAD = False
 if os.getenv('DJANGO_TRUST_PROXY', 'false').lower() == 'true':
@@ -40,6 +46,9 @@ if os.getenv('DJANGO_TRUST_PROXY', 'false').lower() == 'true':
     SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 DATA_UPLOAD_MAX_MEMORY_SIZE = 4096
 DOCS_ENABLED = os.getenv('DJANGO_DOCS_ENABLED', 'true').lower() == 'true'
+API_TOKEN_TTL_SECONDS = int(os.getenv('API_TOKEN_TTL_SECONDS', '3600'))
+if not 60 <= API_TOKEN_TTL_SECONDS <= 86400:
+    raise ValueError('API_TOKEN_TTL_SECONDS must be between 60 and 86400.')
 PASSWORD_HASHERS = [
     'django.contrib.auth.hashers.PBKDF2PasswordHasher',
     'django.contrib.auth.hashers.PBKDF2SHA1PasswordHasher',
@@ -101,12 +110,12 @@ if os.getenv('DB_ENGINE', 'sqlite') == 'postgresql':
     DATABASES['default'] = {
         'ENGINE': 'django.db.backends.postgresql',
         'NAME': os.environ['DB_NAME'], 'USER': os.environ['DB_USER'],
-        'PASSWORD': os.environ['DB_PASSWORD'], 'HOST': os.environ['DB_HOST'],
+        'PASSWORD': secret('DB_PASSWORD'), 'HOST': os.environ['DB_HOST'],
         'PORT': os.getenv('DB_PORT', '5432'),
         'OPTIONS': {'sslmode': os.getenv('DB_SSLMODE', 'verify-full')},
     }
 SYMPLA_API_HOST = os.getenv('SYMPLA_API_HOST', 'https://api.sympla.com.br/public/v1.6.0')
-SYMPLA_API_KEY = os.getenv('SYMPLA_API_KEY', '')
+SYMPLA_API_KEY = secret('SYMPLA_API_KEY')
 SYNC_MAX_PAGES = 100
 SYNC_MAX_EVENTS = 20000
 SYNC_MAX_PAGE_BYTES = 2 * 1024 * 1024

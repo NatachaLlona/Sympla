@@ -1,159 +1,166 @@
-﻿# Sympla: scheduled synchronization and event history
+﻿# Sympla Integration
 
-Django service that reads the authenticated Sympla account, persists current events,
-creates a new version only when documented event data changes, and records audit evidence.
+Daily and on-demand event synchronization with PostgreSQL persistence, change-only event versions,
+immutable history and API client authentication.
+
+## Start
+
+Requirements: Python 3.10+ on the host and Docker Desktop/Engine with Linux containers and Docker Compose v2.
+The API and worker run on Python 3.13 in Docker. A host virtual environment is not required.
+
+```powershell
+python start.py
+```
+
+In this workspace, C:\Dev\ticketing_sympla\start.py forwards to the maintained release checkout.
+In a Git clone, use start.py from the repository root. The launcher prints the configuration path.
+
+First launch prompts in English for the database username/password, API client ID/secret, and an optional
+Sympla provider token. Password input is hidden and confirmation is required. Invalid passwords explain
+the rules and prompt again: **8 to 16 characters, uppercase, lowercase, digit and special character**;
+printable ASCII only, no spaces. Database credentials and API credentials are separate.
+
+The launcher builds the image, starts PostgreSQL, applies migrations, creates a restricted runtime
+DB role and the initial write-enabled API client, then starts the API and worker. Subsequent launches
+reuse credentials and persistent data. You may close the terminal after the Ready message.
+
+Swagger: **http://127.0.0.1:8010/docs/** (also /swagger/).
+
+## Configuration
+
+Edit config.jsonc before first launch. Comments and trailing commas are supported.
+
+```jsonc
+{
+  "database": { "name": "Simpla", "port": 2424 },
+  "api": { "port": 8010 },
+  "auth": { "token_ttl_seconds": 3600 },
+  "docker": { "project_name": "sympla" }
+}
+```
+
+PostgreSQL is published on host port 2424; containers connect to db:5432 internally.
+Both PostgreSQL and the API bind only to 127.0.0.1. Port changes apply on the next launch.
+Changing the database name/project after initialization is blocked: start.py never silently renames,
+replaces or deletes existing databases. Plan an explicit migration or a separate new instance instead.
+
+Credentials live under .local/, excluded from Git and Docker builds. The launcher restricts this directory
+to the current user (and SYSTEM on Windows). Individual files are mounted as Compose secrets; passwords
+are not Docker command arguments or environment values. The API client secret bootstrap file is cleared
+after its password hash is saved. Database and Django secret files must remain available for restarts.
+Protect this directory and backups of it and the PostgreSQL volume.
+
+If omitted during setup, put the Sympla provider token in .local/sympla_api_key and restart the stack.
+No provider credential is included in the code. Old SQLite/prototype data is not imported automatically.
+
+```powershell
+python start.py --check
+python start.py --logs
+python start.py --stop
+python start.py --reset-api-client
+```
+
+Stop preserves database volumes. Reset prompts for a new API client secret and invalidates existing
+tokens. The launcher never deletes volumes automatically. Use --config PATH --state-dir PATH with
+a distinct Docker project and ports to isolate another instance.
+
+## Authentication and Swagger
+
+**API username = client_id. API password = client_secret.** These credentials are exchanged for an
+expiring opaque Bearer token through the client credentials flow. They are separate from both the
+Sympla provider token and the database credentials.
+
+In Swagger, click Authorize, enter the client ID and client secret chosen during startup, then click
+Authorize again. Swagger calls POST /api/v1/token/ and attaches the returned token to API requests.
+You do not need to generate/paste the token manually. Authorization is not persisted across reloads.
+When the token expires, authorize again.
+
+Direct clients may call:
+
+```http
+POST /api/v1/token/
+Content-Type: application/json
+
+{
+  "grant_type": "client_credentials",
+  "client_id": "your-client-id",
+  "client_secret": "your-client-secret"
+}
+```
+
+The response contains access_token, token_type (Bearer) and expires_in in seconds (default 3600).
+Subsequent requests use Authorization: Bearer <access_token>. Form-urlencoded and HTTP Basic client
+authentication are also supported for OAuth tooling. Do not put credentials in query strings.
+There are no password grants, refresh tokens or arbitrary scopes. Rate limit: 10 token requests per
+minute per source IP; follow Retry-After on 429. Client rotation/revocation invalidates tokens immediately.
+Old non-expiring static tokens are no longer accepted. Only password hashes and token digests are stored;
+API logs never record token request/response bodies or authorization headers.
+
+The first client is write-enabled. Operators can provision additional clients with the administrative
+management command api_user create CLIENT_ID (read-only) or api_user create CLIENT_ID --write, or
+rotate/revoke existing clients. Those commands require the migration-owner database connection.
+There is no anonymous client-registration endpoint.
+
+OpenAPI: /openapi.json. Swagger assets are bundled locally, without an external CDN/validator.
+DJANGO_DOCS_ENABLED=false disables the documentation, schema and assets.
 
 ## API
 
-Interactive Swagger: `/docs/` (also `/swagger/`). OpenAPI JSON: `/openapi.json`.
-Click **Authorize** and paste only the API user's token: Swagger adds `Bearer` automatically.
-The UI uses same-origin bundled assets, disables external validation and does not persist tokens
-across page reloads. Documentation is public; protected routes still require authentication.
-Set `DJANGO_DOCS_ENABLED=false` to disable the UI, schema and assets.
-
-Local development instance: http://127.0.0.1:8010/docs/ . To obtain a token,
-from the repository root run:
-
-```powershell
-.\.venv\Scripts\python.exe ticketing_sympla_app/manage.py api_user create integration --write
-```
-
-If the username already exists, use `api_user rotate integration`. There is no default password,
-password-login route or JWT: the operator provisions a high-entropy opaque API-user token.
-The Sympla provider token is a separate server-side credential. A worker must be running for sync jobs.
-
-All `/api/v1/` routes require `Authorization: Bearer <API_USER_TOKEN>`.
-API user tokens are separate from the Sympla token. Read-only users cannot change schedules or trigger sync.
+Except for the token endpoint, all /api/v1/ routes require an access token. Write operations require
+write permission. Lists accept page and page_size (1 to 100).
 
 | Method | Route | Purpose |
 | --- | --- | --- |
-| POST | `/api/v1/schedules/` | Create a daily schedule, active or inactive |
-| GET | `/api/v1/schedules/?active=true` | List active schedules; omit filter for both states |
-| PATCH | `/api/v1/schedules/{id}/` | Activate/deactivate with `{"active":true}` |
-| DELETE | `/api/v1/schedules/{id}/` | Delete either state; cancel pending scheduled jobs |
-| POST | `/api/v1/sync/` | Queue manual synchronization with `{}`; returns 202 and run ID |
-| GET | `/api/v1/sync-runs/` | See queued/running/success/failed/cancelled jobs and safe error codes |
-| GET | `/api/v1/events/` | Read current events |
-| GET | `/api/v1/events/{id}/versions/` | Read immutable versions and field differences |
-| GET | `/api/v1/audit-logs/` | Read mutation history; filters: resource, target_id, actor |
-| GET | `/api/v1/request-logs/` | Read API access history, including denied requests |
+| POST | /api/v1/token/ | Exchange client credentials for a token |
+| POST | /api/v1/schedules/ | Create a daily active/inactive schedule |
+| GET | /api/v1/schedules/?active=true | List active schedules; omit filter for both states |
+| PATCH | /api/v1/schedules/{id}/ | Activate/deactivate with {"active":true} |
+| DELETE | /api/v1/schedules/{id}/ | Soft-delete either state and cancel queued occurrences |
+| POST | /api/v1/sync/ | Send {} to queue a manual import; returns 202 and run ID |
+| GET | /api/v1/sync-runs/ | Read status, counts and safe error codes |
+| GET | /api/v1/events/ | Read current events |
+| GET | /api/v1/events/{id}/versions/ | Read versions and field differences |
+| GET | /api/v1/audit-logs/ | Read changes; filters: resource, target_id, actor |
+| GET | /api/v1/request-logs/ | Read access history, including denied attempts |
 
-List routes support `page` (default 1) and `page_size` (1–100, default 50).
-`/ping/` is public and reports process liveness only. The unsafe legacy `/update/` route is removed.
-`/admin/` is Django's separate administration, not API authentication; business tables are not editable there.
+Schedule example: {"time":"09:30","timezone":"Europe/Lisbon","active":true}.
+Each recurs daily in its explicit IANA zone. Confirmed means active. Maximum 100 nondeleted schedules;
+duplicate time/zone pairs return 409. Deactivation/deletion cancels queued scheduled jobs, while running
+jobs finish. /ping/ is public process liveness. The unsafe legacy /update/ route is removed.
 
-Example schedule body (JSON):
+## Synchronization and recovery
 
-```json
-{"time":"09:30","timezone":"Europe/Lisbon","active":true}
-```
+The worker runs automatically in Docker, checking schedules every five seconds between imports.
+Manual jobs require no schedule and may queue behind scheduled jobs; a second unfinished manual job
+returns 409. A global running slot prevents concurrent imports. After downtime, one overdue occurrence
+per schedule is queued; missed days are coalesced. DST gaps are skipped; ambiguous times run once.
 
-Create one entry per daily time. Confirmed means active. Timezone is required: no implicit local zone.
-There is a maximum of 100 nondeleted schedules. Duplicate time/zone pairs return 409.
-Deleting is a soft deletion: the schedule disappears from listings but audit evidence remains.
-Deleting/deactivating does not interrupt a job already running.
+Every upstream page is validated before an atomic database import. New events start at version 1;
+identical documented data creates no version. Changes preserve snapshots and before/after field
+values with JSON Pointer paths. Events absent from later responses are retained: absence does not
+prove deletion or cancellation. Current events use allowlisted JSON fields and string external IDs.
+The original SQL file is historical design material; Django migrations are the implemented schema.
+There is no ticket sale, payment processing or attendee ingestion.
 
-## Install locally
+If a worker is interrupted during a run, its running slot remains held. Stop and verify all workers,
+then use recover_sync RUN_UUID --workers-stopped with an administrative connection before restarting.
+This avoids an old worker committing after a replacement. Failures remain visible in sync-runs.
 
-Use a fresh virtual environment and install `requirements.txt`. Django 5.2 LTS targets Python 3.13;
-Python 3.13 and PostgreSQL passed the final tests. Never reuse the original copied virtual environment.
+## Security and deployment
 
-```powershell
-python -m venv .venv
-.\.venv\Scripts\python.exe -m pip install -r requirements.txt
-Copy-Item ticketing_sympla_app/.env.example ticketing_sympla_app/.env
-```
+The supplied stack is a local loopback deployment: DEBUG=false, with HTTP explicitly enabled for local
+testing and PostgreSQL TLS disabled on its private Docker connection. Remote production requires HTTPS,
+trusted forwarding, appropriate database TLS, edge rate limits, backups, retention and monitoring.
+Do not expose the local stack as-is.
 
-Set a new random `DJANGO_SECRET_KEY`, the server-side `SYMPLA_API_KEY`, and the correct Sympla base URL.
-The default URL follows the official current contract. No credential is supplied with this repository.
-For HTTP development on loopback only, set `DJANGO_DEBUG=true`. Production defaults require HTTPS.
+API/worker run as non-root containers with a read-only filesystem and no extra capabilities. The runtime
+DB role is not a superuser and cannot update/delete audit/version history or truncate tables. History
+also has append-only triggers; DB owners can still change protections. Business changes and audit
+evidence commit together, with historical actor names preserved.
 
-From `ticketing_sympla_app`, with the virtual environment activated:
+Sympla requests only target HTTPS api.sympla.com.br; redirects/environment proxies are disabled.
+Pagination, bytes, event count and elapsed-time checks are bounded. Connection/read timeouts are used,
+not a hard process deadline. Safe error codes replace upstream bodies and tracebacks. Restrict access
+to event text and sanitize HTML before rendering it in another UI.
 
-```powershell
-python manage.py migrate
-python manage.py api_user create integration --write
-python manage.py runserver 127.0.0.1:8000
-```
-
-The API-user command prints a new cryptographically random token once. Save it securely; only its SHA-256
-digest is stored. Do not redirect command output to application logs or paste tokens into Git.
-Omit `--write` for a read-only user. Rotate/revoke locally:
-
-```powershell
-python manage.py api_user rotate integration
-python manage.py api_user revoke integration
-```
-
-Rotation preserves permissions and invalidates the previous token immediately. Revocation blocks the user.
-API users are provisioned by an operator, with no anonymous user-creation endpoint.
-
-## Worker: required for both scheduled and manual runs
-
-Run a second process and supervise it as a Windows service, systemd unit or container:
-
-```powershell
-python manage.py sync_worker
-```
-
-The worker checks schedules every five seconds and processes queued jobs. For an external scheduler,
-run `python manage.py sync_worker --once` every minute; do not rely on HTTP traffic to drive scheduling.
-A long synchronization delays processing until its completion. No worker means no synchronization.
-
-Schedules persist in the database. After downtime, one overdue occurrence per schedule is queued;
-missed days are coalesced rather than replayed. DST gaps are skipped; ambiguous times run at the first fold.
-The queue survives restarts. Database coordination and a unique running slot allow only one sync at a time.
-Manual requests work without schedules and may queue behind scheduled work. A second unfinished manual
-request returns 409 to prevent accidental repeated imports.
-
-If a worker dies during a run, the running slot intentionally remains held. Stop and verify all workers,
-then mark that abandoned run failed and restart the worker:
-
-```powershell
-python manage.py recover_sync RUN_UUID --workers-stopped
-```
-
-This deliberately avoids automatic lock expiry allowing an old worker to commit after a replacement.
-Failed runs are retained; retry with a new manual job after fixing the upstream/configuration problem.
-
-## Database and history
-
-SQLite is for single-process development. Use PostgreSQL for production and multiworker coordination.
-Set `DB_ENGINE=postgresql`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `DB_HOST`, `DB_PORT`, `DB_SSLMODE`.
-Production defaults to `verify-full`; configure a trusted database CA. Use separate migration-owner and
-least-privilege runtime accounts; runtime must not have schema ownership, TRUNCATE or trigger privileges.
-Run Django migrations. Do not run the original `sympla_eventos_script.sql`: it is a historical design,
-not the implemented schema. Existing SQLite records are not imported automatically.
-
-Current event data and snapshots are JSON objects containing allowlisted documented Sympla fields.
-Opaque external IDs are preserved as strings; event versions use a local monotonically increasing number.
-The first observation creates version 1; identical content creates no new version. Nested differences use
-JSON Pointer paths and before/after values with existence flags. All event mutations and their audit
-records commit atomically after every upstream page is fetched and validated.
-
-An event absent from a later API response is retained: absence may mean filtering or access changes,
-not cancellation/deletion. Published/private/cancelled field changes returned by Sympla are versioned.
-There is no ticket sales, payment processing, attendee ingestion or public event catalogue.
-
-## Security and operations
-
-- DEBUG is off by default; HTTPS redirect, secure cookies and HSTS are enabled. Configure allowed hosts.
-- Bearer-only authentication: Django cookies/sessions never authorize API access.
-- Every API response has X-Interaction-ID and Cache-Control: no-store. Request logs omit bodies,
-  queries, headers and credentials; business logs carry explicit safe metadata and event changes.
-- Audit logs, request logs and event versions have database triggers rejecting UPDATE and DELETE.
-  This does not protect against the database owner or TRUNCATE; enforce runtime DB privileges.
-- Sympla requests only target HTTPS api.sympla.com.br. Redirects and environment proxies are disabled.
-  Pagination supports has_next and next_cursor, with duplicate detection and page/event/byte limits.
-- Network calls have connection/read timeouts and an elapsed-time budget checked between chunks/pages.
-  This is not a hard process deadline. Jobs fail without partially changing event data.
-- Upstream bodies/exceptions are not returned to clients or saved as error text.
-- Protect the reverse proxy with request limits, rate limiting, HTTPS and restricted backend access.
-  Set DJANGO_TRUST_PROXY=true only when the proxy strips incoming forwarding headers
-  and external clients cannot reach the backend directly.
-- Event descriptions may contain personal data or HTML. Restrict API access, back up history securely,
-  define retention, and sanitize HTML before rendering it in a future UI.
-- No live Sympla account was queried during development; run an authorized staging smoke test before production.
-
-See [VALIDATION.md](VALIDATION.md) for checks and [ANALISE.md](ANALISE.md) for the original prototype review.
-Official contract: https://developers.sympla.com.br/api-docs .
+See VALIDATION.md. A real authorized Sympla staging import remains required before production.
