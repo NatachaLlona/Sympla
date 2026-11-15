@@ -15,21 +15,21 @@ class SyncError(Exception):
             self.details['page'] = page
 
 
-def configuration_error():
+def configuration_error(token=None):
     base = settings.SYMPLA_API_HOST.rstrip('/')
     try:
         parsed = urlsplit(base)
         invalid = (parsed.scheme != 'https' or parsed.hostname != 'api.sympla.com.br'
                    or parsed.port not in (None, 443) or parsed.username or parsed.password
-                   or parsed.query or parsed.fragment or not settings.SYMPLA_API_KEY)
+                   or parsed.query or parsed.fragment or not token)
     except ValueError:
         invalid = True
     return 'upstream_configuration' if invalid else None
 
 
-def fetch_events():
+def fetch_events(token=None):
     """Bounded HTTPS fetch; never log credentials or upstream error bodies."""
-    if configuration_error():
+    if configuration_error(token):
         raise SyncError('upstream_configuration')
     base = settings.SYMPLA_API_HOST.rstrip('/')
     deadline = time.monotonic() + settings.SYNC_TIMEOUT_SECONDS
@@ -45,7 +45,7 @@ def fetch_events():
             if remaining <= 0:
                 raise SyncError('upstream_deadline')
             try:
-                with session.get(base + '/events', headers={'s_token': settings.SYMPLA_API_KEY},
+                with session.get(base + '/events', headers={'s_token': token},
                                  params=params, timeout=(min(5, remaining), min(10, remaining)),
                                  allow_redirects=False, stream=True) as response:
                     if response.status_code != 200:

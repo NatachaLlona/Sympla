@@ -1,4 +1,7 @@
 MESSAGES = {
+    'owner_authorization_changed': 'The owner permission or Sympla token changed during the import. No event changes were committed.',
+    'owner_not_authorized': 'The owner is inactive or no longer has write permission.',
+    'provider_secret_unavailable': 'The provider token cannot be decrypted. Check the provider encryption key.',
     'upstream_configuration': 'Sympla API credentials or host are not configured. Run python start.py --configure-sympla.',
     'upstream_http_error': 'Sympla returned an unsuccessful HTTP response. Check the upstream status and account permissions.',
     'upstream_timeout': 'The connection to Sympla timed out.',

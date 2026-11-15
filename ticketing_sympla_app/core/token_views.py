@@ -105,7 +105,7 @@ def token(request):
                         else DUMMY_HASH
                     ),
                 )
-                if not user or not valid or not user.is_active:
+                if not user or not valid or not user.is_active or user.deleted_at:
                     result = JsonResponse({"error": "invalid_client"}, status=401)
                     result["WWW-Authenticate"] = 'Basic realm="token"'
                 else:
@@ -129,6 +129,7 @@ def token(request):
                         }
                     )
         ApiRequestLog.objects.create(
+            owner_identifier=user.identifier if actor else None,
             interaction_id=interaction,
             started_at=started,
             finished_at=timezone.now(),

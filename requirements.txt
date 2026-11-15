@@ -5,3 +5,4 @@ psycopg[binary]==3.3.9
 tzdata==2026.6
 drf-spectacular-sidecar==2026.10.1
 waitress==3.0.2
+cryptography==50.0.2

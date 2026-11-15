@@ -5,6 +5,7 @@ import json
 import subprocess
 from pathlib import Path
 import time
+import uuid
 from unittest.mock import patch
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
@@ -65,6 +66,22 @@ def main():
     )
     token = result["access_token"]
     assert result["expires_in"] == 120
+    master_info = request('/me', token=token)
+    assert master_info['is_superuser'] and set(master_info['permissions']) == {'read', 'write', 'edit', 'delete'}
+    suffix = uuid.uuid4().hex[:8]
+    role = request('/roles', {'name': 'QA reader ' + suffix, 'permissions': ['read']}, token)
+    child = request('/api-users', {'client_id': 'qa-tenant-' + suffix,
+        'role_identifier': role['identifier'], 'sympla_token': 'qa-tenant-provider-no-live-access'}, token)
+    assert child['sympla_token_configured'] and 'sympla_token' not in child
+    child_token = request('/api/v1/token/', {'grant_type':'client_credentials',
+        'client_id':child['client_id'], 'client_secret':child['client_secret']})['access_token']
+    assert request('/api/users/' + child['identifier'], token=token)['identifier'] == child['identifier']
+    assert request('/api/v1/events/', token=child_token)['count'] == 0
+    try:
+        request('/api/v1/sync/', {}, child_token)
+        raise AssertionError('A read-only role must not trigger synchronization')
+    except HTTPError as exc:
+        assert exc.code == 403
     existing = request("/api/v1/schedules/", token=token)["results"]
     schedule = (
         existing[0]
@@ -82,7 +99,7 @@ def main():
         assert exc.code == 503
         assert json.load(exc)['error'] == 'upstream_configuration'
     # Scheduled/operator-created jobs still exercise the worker's safe configuration failure.
-    code = "from django.db import transaction; from core.services import enqueue\nwith transaction.atomic():\n run=enqueue('qa-operator')\n print(run.pk)"
+    code = "from django.db import transaction; from core.services import enqueue; from core.models import ApiUser\nwith transaction.atomic():\n run=enqueue('qa-operator', owner=ApiUser.objects.get(is_superuser=True))\n print(run.pk)"
     identifier = subprocess.check_output(['docker', 'exec', 'sympla-startup-qa-api-1',
         'python', 'manage.py', 'shell', '-c', code], text=True).strip().splitlines()[-1]
     run = {'id': identifier}

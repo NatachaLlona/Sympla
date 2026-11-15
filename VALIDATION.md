@@ -49,3 +49,17 @@ The normal Docker worker successfully processed scheduled imports and a manual i
 and three initial versions were persisted. Repeated reads reported three unchanged events and did not
 create duplicate versions. Earlier failures remain in the execution/audit history. Automated QA still
 uses only mocks or disposable infrastructure. Regression suite: 39 tests passed on Python 3.13/PostgreSQL.
+
+RBAC regression coverage: protected bootstrap master, UUID identity lookup/alias, role lifecycle,
+independent permission enforcement, individual grants, client issue/revoke, deactivation, access-token
+invalidation, encrypted/write-only provider credentials, cross-user access denial, no global fallback,
+and stale-import rollback after provider changes. The Docker launcher additionally provisions a
+read-only ordinary client and verifies its provider configuration and inability to trigger imports.
+Legacy upgrade checks preserve records and separate the ownership backfill from NOT NULL DDL to
+avoid PostgreSQL deferred-FK trigger conflicts. All 51 tests passed on Python 3.13/PostgreSQL 17.
+
+Live upgrade verification: a private pre-upgrade database backup was saved. The running stack preserved
+3 events, 3 versions, 9 schedules and 12 historical runs and assigned their ownership to the master.
+The API no longer has a global provider token configured; the master provider credential is encrypted.
+The public Swagger schema exposes Identity/Authorization, the UUID lookup alias, mandatory per-user
+provider token input and the four permission codes. No QA users were created in the normal instance.

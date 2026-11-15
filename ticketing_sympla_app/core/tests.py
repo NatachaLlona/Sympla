@@ -1,4 +1,4 @@
-﻿import hashlib
+import hashlib
 import json
 import uuid
 from concurrent.futures import ThreadPoolExecutor
@@ -14,14 +14,15 @@ from .models import ApiUser, AccessToken, Schedule, SyncRun, Event, EventVersion
 from .scheduling import next_occurrence
 from .services import enqueue, enqueue_due, process_one, claim_run, persist_events
 from .sympla import fetch_events, SyncError
+from .credentials import configure_client
+from .models import Role
 
 
 @override_settings(SYMPLA_API_KEY='test-placeholder-not-real')
 class ApiTests(TestCase):
     def setUp(self):
         self.token = 'test-token-that-is-never-a-real-credential'
-        self.user = ApiUser.objects.create(username='writer', can_write=True,
-            client_secret_hash=make_password('Testing1!'))
+        self.user = configure_client('writer', 'Testing1!', can_write=True, sympla_token='test-placeholder-not-real')
         AccessToken.objects.create(user=self.user, credential_version=self.user.credential_version,
             expires_at=timezone.now() + timedelta(hours=1), token_hash=hashlib.sha256(self.token.encode()).hexdigest())
         self.headers = {'HTTP_AUTHORIZATION': 'Bearer ' + self.token}
@@ -31,7 +32,7 @@ class ApiTests(TestCase):
 
     def test_authentication_revocation_and_readonly(self):
         self.assertEqual(self.client.get('/api/v1/schedules/').status_code, 401)
-        self.user.can_write = False
+        self.user.role = Role.objects.get(name='reader')
         self.user.save()
         self.assertEqual(self.post('/api/v1/sync/', {}).status_code, 403)
         self.assertEqual(self.client.get('/api/v1/events/', **self.headers).status_code, 200)
@@ -69,6 +70,8 @@ class ApiTests(TestCase):
 
     @override_settings(SYMPLA_API_KEY='')
     def test_missing_provider_token_returns_actionable_error_without_queuing(self):
+        self.user.sympla_token_encrypted = ''
+        self.user.save(update_fields=['sympla_token_encrypted'])
         result = self.post('/api/v1/sync/', {})
         self.assertEqual(result.status_code, 503)
         self.assertEqual(result.json()['error'], 'upstream_configuration')
@@ -136,7 +139,7 @@ class ApiTests(TestCase):
         self.assertNotIn(replacement, str(list(AuditLog.objects.values())))
 
     def test_scheduled_job_does_not_block_manual_queue(self):
-        enqueue('scheduler', source='scheduled')
+        enqueue('scheduler', source='scheduled', owner=self.user)
         self.assertEqual(self.post('/api/v1/sync/', {}).status_code, 202)
 
     def test_oversized_request_is_rejected(self):
@@ -145,8 +148,11 @@ class ApiTests(TestCase):
 
 
 class SyncTests(TestCase):
+    def setUp(self):
+        self.user = configure_client('tester', 'Testing1!', sympla_token='test-provider')
+
     def queue(self):
-        return enqueue('tester')
+        return enqueue('tester', owner=self.user)
 
     @patch('core.services.fetch_events')
     def test_versioning_and_nested_differences(self, fetch):
@@ -182,7 +188,7 @@ class SyncTests(TestCase):
 
     @patch('core.services.fetch_events', side_effect=SyncError('upstream_http_error'))
     def test_upstream_failure_preserves_existing_events(self, fetch):
-        Event.objects.create(external_id='existing', data={'id': 'existing'}, version=1)
+        Event.objects.create(owner=self.user, external_id='existing', data={'id': 'existing'}, version=1)
         self.queue()
         self.assertEqual(process_one().error_code, 'upstream_http_error')
         self.assertEqual(Event.objects.count(), 1)
@@ -195,9 +201,9 @@ class SyncTests(TestCase):
 
     def test_due_once_inactive_ignored_and_downtime_coalesced(self):
         now = timezone.now()
-        schedule = Schedule.objects.create(time=time(9), timezone='UTC', active=True,
+        schedule = Schedule.objects.create(owner=self.user, time=time(9), timezone='UTC', active=True,
                   next_run_at=now-timedelta(days=3), created_by='tester')
-        Schedule.objects.create(time=time(10), timezone='UTC', active=False,
+        Schedule.objects.create(owner=self.user, time=time(10), timezone='UTC', active=False,
                   next_run_at=now-timedelta(days=3), created_by='tester')
         self.assertEqual(enqueue_due(now), 1)
         self.assertEqual(enqueue_due(now), 0)
@@ -235,7 +241,7 @@ class FetchTests(TestCase):
         client = session.return_value.__enter__.return_value
         client.get.side_effect = [self.response({'data': [{'id': '1'}], 'pagination': {'quantity': 1, 'has_next': True}}),
                                   self.response({'data': [{'id': '2'}], 'pagination': {'quantity': 1, 'has_next': False}})]
-        self.assertEqual(len(fetch_events()), 2)
+        self.assertEqual(len(fetch_events(token='test-not-real')), 2)
         self.assertFalse(client.get.call_args.kwargs['allow_redirects'])
 
     @patch('core.sympla.requests.Session')
@@ -243,7 +249,7 @@ class FetchTests(TestCase):
         client = session.return_value.__enter__.return_value
         client.get.side_effect = [self.response({'data': [{'id': '1'}], 'pagination': {'next_cursor': 'next'}}),
                                   self.response({'data': [{'id': '2'}], 'pagination': {'next_cursor': None}})]
-        self.assertEqual(len(fetch_events()), 2)
+        self.assertEqual(len(fetch_events(token='test-not-real')), 2)
         self.assertEqual(client.get.call_args.kwargs['params']['cursor'], 'next')
 
     @patch('core.sympla.requests.Session')
@@ -251,13 +257,13 @@ class FetchTests(TestCase):
         client = session.return_value.__enter__.return_value
         for batch, size in [([{'id': '1'}, {'id': '2'}, {'id': '3'}], 200), ([], 200), ([{'id': '1'}], 1)]:
             client.get.return_value = self.response({'data': batch, 'pagination': {'quantity': len(batch), 'page_size': size}})
-            self.assertEqual(fetch_events(), batch)
+            self.assertEqual(fetch_events(token='test-not-real'), batch)
 
     @patch('core.sympla.requests.Session')
     def test_http_error_preserves_only_safe_status_and_page(self, session):
         session.return_value.__enter__.return_value.get.return_value = self.response({'secret': 'never-log'}, 401)
         with self.assertRaises(SyncError) as error:
-            fetch_events()
+            fetch_events(token='test-not-real')
         self.assertEqual(error.exception.details, {'upstream_http_status': 401, 'page': 1})
         self.assertNotIn('never-log', str(error.exception))
 
@@ -269,13 +275,13 @@ class FetchTests(TestCase):
             client.get.side_effect = None
             client.get.return_value = response
             with self.assertRaises(SyncError):
-                fetch_events()
+                fetch_events(token='test-not-real')
 
     @override_settings(SYMPLA_API_HOST='https://attacker.example')
     @patch('core.sympla.requests.Session')
     def test_disallowed_host_never_receives_token(self, session):
         with self.assertRaises(SyncError):
-            fetch_events()
+            fetch_events(token='test-not-real')
         session.assert_not_called()
 
 
@@ -284,11 +290,12 @@ class PostgresConcurrencyTests(TransactionTestCase):
         if connection.vendor != 'postgresql':
             self.skipTest('Real row locks require PostgreSQL')
         Coordinator.objects.get_or_create(pk=1)
+        self.user = configure_client('concurrent', 'Testing1!', sympla_token='test-provider')
 
     def test_two_workers_claim_only_one_global_slot(self):
         with transaction.atomic():
-            enqueue('one')
-            enqueue('two')
+            enqueue('one', owner=self.user)
+            enqueue('two', owner=self.user)
         def claim():
             close_old_connections()
             try:
@@ -303,7 +310,7 @@ class PostgresConcurrencyTests(TransactionTestCase):
 
     def test_two_schedulers_enqueue_only_one_occurrence(self):
         now = timezone.now()
-        Schedule.objects.create(time=time(9), timezone='UTC', active=True,
+        Schedule.objects.create(owner=self.user, time=time(9), timezone='UTC', active=True,
             next_run_at=now-timedelta(minutes=1), created_by='tester')
         def tick():
             close_old_connections()

@@ -63,7 +63,7 @@ def operation(
         "401": response(
             "Missing, invalid or expired access token, or revoked client.", ref("Error")
         ),
-        "403": response("Client does not have write permission.", ref("Error")),
+        "403": response("The required permission or master authority is missing.", ref("Error")),
         "405": response("Method not allowed.", ref("Error")),
         "500": response(
             "Internal error; uncommitted changes are rolled back.", ref("Error")
@@ -417,3 +417,6 @@ PATHS['/api/v1/sync-runs/{run_id}/'] = {'get': operation(
     parameters=[{'name': 'run_id', 'in': 'path', 'required': True, 'schema': text(format='uuid')}])}
 PATHS['/api/v1/sync-runs/{run_id}/']['get']['responses']['404'] = response('Run not found', ref('Error'))
 PATHS['/api/v1/sync/']['post']['responses']['503'] = response('Sympla credentials or host are not configured', ref('Error'))
+
+from .identity_schema import extend
+extend(SCHEMA)

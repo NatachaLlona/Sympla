@@ -5,8 +5,11 @@ from django.core.management import call_command
 from django.core.management.base import BaseCommand, CommandError
 from django.db import connection, transaction
 from psycopg import sql
-from core.models import ApiUser
+from core.models import ApiUser, Role, Schedule, SyncRun, Event
 from core.credentials import configure_client
+from core.provider_secrets import encrypt_token, decrypt_token, ProviderSecretError
+from django.conf import settings
+from core.rbac import ensure_catalog
 
 
 class Command(BaseCommand):
@@ -29,7 +32,11 @@ class Command(BaseCommand):
         )
         rotate = os.getenv("ROTATE_INITIAL_CLIENT") == "true"
         with transaction.atomic():
+            ensure_catalog()
             existing = ApiUser.objects.filter(username=client_id).first()
+            master = ApiUser.objects.filter(is_superuser=True).first()
+            if master and master.username != client_id:
+                raise CommandError('The master client ID cannot be replaced by a different account.')
             if not existing or rotate:
                 if not client_secret:
                     raise CommandError(
@@ -38,6 +45,20 @@ class Command(BaseCommand):
                 configure_client(
                     client_id, client_secret, can_write=True, rotate=bool(existing)
                 )
+            master = ApiUser.objects.select_for_update().get(username=client_id)
+            master.is_superuser, master.role = True, Role.objects.get(name='master')
+            if (not master.sympla_token_encrypted or os.getenv('CONFIGURE_MASTER_PROVIDER') == 'true') and settings.SYMPLA_API_KEY:
+                master.sympla_token_encrypted = encrypt_token(settings.SYMPLA_API_KEY)
+                master.provider_version += 1
+            master.save(update_fields=['is_superuser', 'role', 'sympla_token_encrypted', 'provider_version'])
+            try:
+                for account in ApiUser.objects.exclude(sympla_token_encrypted='').iterator():
+                    decrypt_token(account)
+            except ProviderSecretError:
+                raise CommandError('Stored provider tokens cannot be decrypted. Restore the original provider encryption key.') from None
+            # Existing global data belongs to the original provider/master account, never to new clients.
+            for model in [Schedule, SyncRun, Event]:
+                model.objects.filter(owner__isnull=True).update(owner=master)
             with connection.cursor() as cursor:
                 cursor.execute("SELECT 1 FROM pg_roles WHERE rolname = %s", [role])
                 if not cursor.fetchone():
@@ -78,4 +99,6 @@ class Command(BaseCommand):
                         "core_eventversion, django_migrations FROM {}"
                     ).format(sql.Identifier(role))
                 )
-        self.stdout.write("Database migrations, runtime role and API client are ready.")
+        if not master.sympla_token_encrypted:
+            self.stdout.write('Warning: the master Sympla token is not configured. Use start.py --configure-sympla. Other API users require their own token.')
+        self.stdout.write("Database migrations, runtime role and protected master API client are ready.")

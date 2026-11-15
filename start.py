@@ -7,6 +7,7 @@ import os
 from pathlib import Path
 import re
 import secrets
+import base64
 import subprocess
 import sys
 
@@ -216,12 +217,15 @@ def main(argv=None):
         action="store_true",
         help="Set a new client secret and revoke existing tokens",
     )
-    actions.add_argument('--configure-sympla', action='store_true',
-                         help='Configure the Sympla provider token without changing API client credentials')
+    actions.add_argument(
+        "--configure-sympla",
+        action="store_true",
+        help="Configure the Sympla provider token without changing API client credentials",
+    )
     args = parser.parse_args(argv)
     try:
         config = load_config(args.config)
-        print('Configuration: ' + str(args.config.resolve()), flush=True)
+        print("Configuration: " + str(args.config.resolve()), flush=True)
         run(["docker", "info"], quiet=True)
         run(["docker", "compose", "version"], quiet=True)
         if args.check:
@@ -304,23 +308,33 @@ def main(argv=None):
             }
             write_file(state_path, json.dumps(state, indent=2))
         elif args.reset_api_client:
-            client_id = ask_identifier(
-                f"API client ID [{state['client_id']}]: ",
-                r"[A-Za-z0-9_.-]{3,100}",
-                "Invalid client ID.",
-                default=state["client_id"],
-            )
+            client_id = state["client_id"]
+            print("Resetting credentials for the protected master client: " + client_id)
             client_secret = ask_password("API client secret (API password)")
             write_file(state_dir / "client_secret", client_secret)
             state.update(client_id=client_id, client_setup_pending=True)
             write_file(state_path, json.dumps(state, indent=2))
         elif args.configure_sympla:
-            token = getpass.getpass('Sympla API token: ').strip()
+            token = getpass.getpass("Sympla API token: ").strip()
             if not token:
-                raise StartupError('Sympla API token must not be empty. The existing token was not changed.')
-            write_file(state_dir / 'sympla_api_key', token)
-            print('Sympla provider token saved. The API and worker will reload it.')
+                raise StartupError(
+                    "Sympla API token must not be empty. The existing token was not changed."
+                )
+            write_file(state_dir / "sympla_api_key", token)
+            print("Sympla provider token saved. The API and worker will reload it.")
+        key_path = state_dir / "provider_encryption_key"
+        if not key_path.exists():
+            if state.get("provider_encryption_initialized"):
+                raise StartupError(
+                    "Provider encryption key is missing. Restore the original key; a replacement would not decrypt stored tokens."
+                )
+            write_file(
+                key_path, base64.urlsafe_b64encode(secrets.token_bytes(32)).decode()
+            )
+        state["provider_encryption_initialized"] = True
+        write_file(state_path, json.dumps(state, indent=2))
         env = compose_environment(config, state_dir, state)
+        env["CONFIGURE_MASTER_PROVIDER"] = "true" if args.configure_sympla else "false"
         if args.stop:
             run(base + ["stop"], env)
             print("Containers stopped. Database volume and credentials were preserved.")
@@ -328,21 +342,21 @@ def main(argv=None):
         if args.logs:
             run(base + ["logs", "--follow", "api", "worker"], env)
             return 0
-        if not (state_dir / 'sympla_api_key').read_text(encoding='utf-8').strip():
-            print('Warning: Sympla imports are disabled because the provider token is missing. '
-                  'Run python start.py --configure-sympla.')
         print("Building the application and starting PostgreSQL...")
         run(base + ["build", "api"], env)
         run(base + ["up", "--detach", "--wait", "db"], env)
+        # Do not let a previous application version write during ownership/schema migrations.
+        run(base + ["stop", "api", "worker"], env)
         run(base + ["run", "--rm", "--no-deps", "bootstrap"], env)
         # The API client secret is only needed to create/rotate its password hash.
         write_file(state_dir / "client_secret", "")
+        write_file(state_dir / 'sympla_api_key', '')
         state["client_setup_pending"] = False
         write_file(state_path, json.dumps(state, indent=2))
-        app_up = ['up', '--detach', '--wait']
+        app_up = ["up", "--detach", "--wait"]
         if args.configure_sympla:
-            app_up.append('--force-recreate')
-        run(base + app_up + ['api', 'worker'], env)
+            app_up.append("--force-recreate")
+        run(base + app_up + ["api", "worker"], env)
         print(f"Ready. Swagger: http://127.0.0.1:{config['api']['port']}/docs/")
         print(
             f"Client ID: {state['client_id']}. Use your client secret in Swagger Authorize."

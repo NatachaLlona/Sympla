@@ -116,6 +116,7 @@ if os.getenv('DB_ENGINE', 'sqlite') == 'postgresql':
     }
 SYMPLA_API_HOST = os.getenv('SYMPLA_API_HOST', 'https://api.sympla.com.br/public/v1.6.0')
 SYMPLA_API_KEY = secret('SYMPLA_API_KEY')
+PROVIDER_ENCRYPTION_KEY = secret('PROVIDER_ENCRYPTION_KEY')
 SYNC_MAX_PAGES = 100
 SYNC_MAX_EVENTS = 20000
 SYNC_MAX_PAGE_BYTES = 2 * 1024 * 1024

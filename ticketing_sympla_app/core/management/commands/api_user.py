@@ -38,12 +38,14 @@ class Command(BaseCommand):
         secret = getpass.getpass("Client secret: ")
         if getpass.getpass("Confirm client secret: ") != secret:
             raise CommandError("Client secrets do not match.")
+        provider = getpass.getpass('Sympla token for this account: ').strip() if action == 'create' else None
         try:
             configure_client(
                 name,
                 secret,
                 can_write=user.can_write if user else options["write"],
                 rotate=(action == "rotate"),
+                sympla_token=provider,
             )
         except ValueError as exc:
             raise CommandError(str(exc)) from None

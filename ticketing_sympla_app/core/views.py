@@ -1,4 +1,4 @@
-﻿import json
+import json
 import re
 from datetime import time
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
@@ -12,6 +12,7 @@ from .scheduling import next_occurrence
 from .services import audit, enqueue
 from .sympla import configuration_error
 from .sync_errors import message
+from .provider_secrets import decrypt_token, ProviderSecretError
 
 
 @require_GET
@@ -50,7 +51,7 @@ def page(request, queryset, fields):
 @api_endpoint(['GET', 'POST'])
 def schedules(request):
     if request.method == 'GET':
-        query = Schedule.objects.filter(deleted_at__isnull=True).order_by('id')
+        query = Schedule.objects.filter(owner=request.api_user, deleted_at__isnull=True).order_by('id')
         active = request.GET.get('active')
         if active is not None:
             if active not in ('true', 'false'):
@@ -64,8 +65,6 @@ def schedules(request):
             return JsonResponse({'error': 'invalid_pagination'}, status=400)
         return JsonResponse({'count': query.count(), 'results': [schedule_data(s) for s in
                             query[(number - 1) * size:number * size]]})
-    if not request.api_user.can_write:
-        return JsonResponse({'error': 'forbidden'}, status=403)
     try:
         data = body(request, {'time', 'timezone', 'active'})
         clock = data['time']
@@ -81,12 +80,12 @@ def schedules(request):
         clock = time.fromisoformat(clock)
         with transaction.atomic():
             Coordinator.objects.select_for_update().get(pk=1)
-            if Schedule.objects.filter(deleted_at__isnull=True).count() >= 100:
+            if Schedule.objects.filter(owner=request.api_user, deleted_at__isnull=True).count() >= 100:
                 return JsonResponse({'error': 'schedule_limit'}, status=409)
-            item = Schedule.objects.create(time=clock, timezone=zone, active=active,
+            item = Schedule.objects.create(owner=request.api_user, time=clock, timezone=zone, active=active,
                 next_run_at=next_occurrence(clock, zone, timezone.now()), created_by=request.api_user.username)
             audit(request.api_user.username, 'schedule.created', 'schedule', item.pk,
-                  {'time': data['time'], 'timezone': zone, 'active': active}, request.interaction_id)
+                  {'time': data['time'], 'timezone': zone, 'active': active}, request.interaction_id, owner=request.api_user)
         return JsonResponse(schedule_data(item), status=201)
     except IntegrityError:
         return JsonResponse({'error': 'duplicate_schedule'}, status=409)
@@ -97,7 +96,7 @@ def schedules(request):
 @api_endpoint(['DELETE', 'PATCH'], write=True)
 def schedule_detail(request, schedule_id):
     Coordinator.objects.select_for_update().get(pk=1)
-    item = Schedule.objects.select_for_update().filter(pk=schedule_id, deleted_at__isnull=True).first()
+    item = Schedule.objects.select_for_update().filter(owner=request.api_user, pk=schedule_id, deleted_at__isnull=True).first()
     if item is None:
         return JsonResponse({'error': 'not_found'}, status=404)
     old = item.active
@@ -121,8 +120,8 @@ def schedule_detail(request, schedule_id):
             run.status, run.finished_at = 'cancelled', timezone.now()
             run.save(update_fields=['status', 'finished_at'])
             audit(request.api_user.username, 'sync.cancelled', 'sync_run', run.pk,
-                  interaction=request.interaction_id)
-    audit(request.api_user.username, action, 'schedule', item.pk, changes, request.interaction_id)
+                  interaction=request.interaction_id, owner=request.api_user)
+    audit(request.api_user.username, action, 'schedule', item.pk, changes, request.interaction_id, owner=request.api_user)
     return HttpResponse(status=204) if request.method == 'DELETE' else JsonResponse(schedule_data(item))
 
 
@@ -133,12 +132,15 @@ def sync_now(request):
         body(request, set())
     except (ValueError, TypeError):
         return JsonResponse({'error': 'expected_empty_json_object'}, status=400)
-    error = configuration_error()
+    try:
+        error = configuration_error(decrypt_token(request.api_user))
+    except ProviderSecretError:
+        error = 'provider_secret_unavailable'
     if error:
         return JsonResponse({'error': error, 'message': message(error)}, status=503)
-    if SyncRun.objects.filter(source='manual', status__in=['queued', 'running']).exists():
+    if SyncRun.objects.filter(owner=request.api_user, source='manual', status__in=['queued', 'running']).exists():
         return JsonResponse({'error': 'sync_pending'}, status=409)
-    run = enqueue(request.api_user.username, interaction=request.interaction_id)
+    run = enqueue(request.api_user.username, interaction=request.interaction_id, owner=request.api_user)
     return JsonResponse({'id': str(run.pk), 'status': run.status,
         'status_url': f'/api/v1/sync-runs/{run.pk}/',
         'message': 'Synchronization queued. Check status_url for the result; events are available after success.'}, status=202)
@@ -146,14 +148,14 @@ def sync_now(request):
 
 @api_endpoint(['GET'])
 def runs(request):
-    return page(request, SyncRun.objects.order_by('-created_at'),
+    return page(request, SyncRun.objects.filter(owner=request.api_user).order_by('-created_at'),
         ['id', 'source', 'actor', 'schedule_id', 'scheduled_for', 'status', 'created_at',
          'started_at', 'finished_at', 'error_code', 'error_details', 'counts'])
 
 
 @api_endpoint(['GET'])
 def run_detail(request, run_id):
-    run = SyncRun.objects.filter(pk=run_id).values('id', 'source', 'actor', 'schedule_id',
+    run = SyncRun.objects.filter(owner=request.api_user, pk=run_id).values('id', 'source', 'actor', 'schedule_id',
         'scheduled_for', 'status', 'created_at', 'started_at', 'finished_at', 'error_code', 'error_details', 'counts').first()
     if not run:
         return JsonResponse({'error': 'not_found'}, status=404)
@@ -164,20 +166,22 @@ def run_detail(request, run_id):
 
 @api_endpoint(['GET'])
 def events(request):
-    return page(request, Event.objects.order_by('id'), ['id', 'external_id', 'version', 'updated_at', 'data'])
+    return page(request, Event.objects.filter(owner=request.api_user).order_by('id'), ['id', 'external_id', 'version', 'updated_at', 'data'])
 
 
 @api_endpoint(['GET'])
 def versions(request, event_id):
-    if not Event.objects.filter(pk=event_id).exists():
+    if not Event.objects.filter(owner=request.api_user, pk=event_id).exists():
         return JsonResponse({'error': 'not_found'}, status=404)
-    return page(request, EventVersion.objects.filter(event_id=event_id).order_by('-version'),
+    return page(request, EventVersion.objects.filter(event__owner=request.api_user, event_id=event_id).order_by('-version'),
                 ['id', 'version', 'created_at', 'run_id', 'data', 'differences'])
 
 
 @api_endpoint(['GET'])
 def audit_logs(request):
     query = AuditLog.objects.order_by('-id')
+    if not request.api_user.is_superuser:
+        query = query.filter(owner_identifier=request.api_user.identifier)
     for field in ['resource', 'target_id', 'actor']:
         if field in request.GET:
             query = query.filter(**{field: request.GET[field]})
@@ -187,5 +191,8 @@ def audit_logs(request):
 
 @api_endpoint(['GET'])
 def request_logs(request):
-    return page(request, ApiRequestLog.objects.order_by('-id'), ['id', 'interaction_id',
+    query = ApiRequestLog.objects.order_by('-id')
+    if not request.api_user.is_superuser:
+        query = query.filter(owner_identifier=request.api_user.identifier)
+    return page(request, query, ['id', 'interaction_id',
         'started_at', 'finished_at', 'actor', 'method', 'path', 'http_status'])

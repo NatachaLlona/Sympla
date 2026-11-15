@@ -20,4 +20,4 @@ class Command(BaseCommand):
         run.status, run.running_slot, run.finished_at = 'failed', None, timezone.now()
         run.error_code = 'worker_interrupted'
         run.save()
-        audit('local-administrator', 'sync.recovered', 'sync_run', run.pk, interaction=run.pk)
+        audit('local-administrator', 'sync.recovered', 'sync_run', run.pk, interaction=run.pk, owner=run.owner)

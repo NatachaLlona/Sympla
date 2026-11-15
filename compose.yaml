@@ -16,9 +16,9 @@ x-app: &app
     DB_PASSWORD_FILE: /run/secrets/db_password
     DB_SSLMODE: disable
     API_TOKEN_TTL_SECONDS: ${API_TOKEN_TTL_SECONDS:-3600}
-    SYMPLA_API_KEY_FILE: /run/secrets/sympla_api_key
+    PROVIDER_ENCRYPTION_KEY_FILE: /run/secrets/provider_encryption_key
     SYMPLA_API_HOST: https://api.sympla.com.br/public/v1.6.0
-  secrets: [django_secret, db_password, sympla_api_key]
+  secrets: [django_secret, db_password, provider_encryption_key]
   security_opt: [no-new-privileges:true]
   cap_drop: [ALL]
   read_only: true
@@ -53,7 +53,9 @@ services:
       INITIAL_CLIENT_ID: ${API_CLIENT_ID}
       INITIAL_CLIENT_SECRET_FILE: /run/secrets/client_secret
       ROTATE_INITIAL_CLIENT: ${ROTATE_INITIAL_CLIENT:-false}
-    secrets: [django_secret, db_password, db_admin_password, sympla_api_key, client_secret]
+      CONFIGURE_MASTER_PROVIDER: ${CONFIGURE_MASTER_PROVIDER:-false}
+      SYMPLA_API_KEY_FILE: /run/secrets/sympla_api_key
+    secrets: [django_secret, db_password, db_admin_password, sympla_api_key, client_secret, provider_encryption_key]
     depends_on:
       db: {condition: service_healthy}
   api:
@@ -68,6 +70,7 @@ services:
       retries: 12
   worker:
     <<: *app
+    stop_grace_period: 360s
     command: [python, manage.py, sync_worker]
     depends_on:
       db: {condition: service_healthy}
@@ -81,3 +84,4 @@ secrets:
   db_admin_password: {file: '${STATE_DIR}/db_admin_password'}
   sympla_api_key: {file: '${STATE_DIR}/sympla_api_key'}
   client_secret: {file: '${STATE_DIR}/client_secret'}
+  provider_encryption_key: {file: '${STATE_DIR}/provider_encryption_key'}

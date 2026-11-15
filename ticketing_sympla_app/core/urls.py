@@ -2,8 +2,28 @@
 from . import views
 from . import docs
 from .token_views import token
+from . import identity
 
 urlpatterns = [
+    path('me', identity.me),
+    path('api/v1/me/', identity.me),
+    path('api-users', identity.users),
+    path('api-users/<uuid:user_identifier>', identity.user_detail),
+    path('api-users/<uuid:user_identifier>/role', identity.assign_role),
+    path('api-users/<uuid:user_identifier>/permissions', identity.individual_permissions),
+    path('api-users/<uuid:user_identifier>/credentials', identity.issue_credentials),
+    path('api-users/<uuid:user_identifier>/sympla-token', identity.provider_token),
+    path('credentials/<uuid:credential_identifier>', identity.revoke_credentials),
+    path('roles', identity.roles),
+    path('roles/<uuid:role_identifier>', identity.role_detail),
+    path('roles/<uuid:role_identifier>/permissions', identity.role_permissions),
+    path('permissions', identity.permissions),
+    path('access-rules', identity.access_rules),
+    path('access-rules/<uuid:rule_identifier>', identity.remove_rule),
+    path('api/users', identity.users),
+    path('api/users/<uuid:user_identifier>', identity.user_detail),
+    path('api/v1/api-users/', identity.users),
+    path('api/v1/api-users/<uuid:user_identifier>/', identity.user_detail),
     path('api/v1/token/', token, name='api-token'),
     path('docs/', docs.swagger, name='swagger'),
     path('swagger/', docs.swagger),

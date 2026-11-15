@@ -1,6 +1,7 @@
 from django.db import models
 from django.db.models import Q
 from django.utils import timezone as django_timezone
+import uuid
 
 
 class Coordinator(models.Model):
@@ -8,7 +9,27 @@ class Coordinator(models.Model):
     pass
 
 
+class Permission(models.Model):
+    code = models.CharField(max_length=10, primary_key=True)
+    description = models.CharField(max_length=100)
+
+
+class Role(models.Model):
+    identifier = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
+    name = models.CharField(max_length=80, unique=True)
+    description = models.CharField(max_length=200, blank=True)
+    is_system = models.BooleanField(default=False)
+    permissions = models.ManyToManyField(Permission)
+
+
 class ApiUser(models.Model):
+    identifier = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
+    credential_identifier = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
+    role = models.ForeignKey(Role, null=True, on_delete=models.PROTECT)
+    is_superuser = models.BooleanField(default=False)
+    deleted_at = models.DateTimeField(null=True)
+    sympla_token_encrypted = models.TextField(blank=True)
+    provider_version = models.PositiveIntegerField(default=1)
     username = models.CharField(max_length=100, unique=True)
     token_hash = models.CharField(max_length=64, unique=True, null=True)
     client_secret_hash = models.CharField(max_length=256, blank=True)
@@ -16,6 +37,18 @@ class ApiUser(models.Model):
     is_active = models.BooleanField(default=True)
     can_write = models.BooleanField(default=False)
     created_at = models.DateTimeField(default=django_timezone.now)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=['is_superuser'], condition=Q(is_superuser=True), name='one_bootstrap_master')]
+
+
+class AccessRule(models.Model):
+    identifier = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
+    user = models.ForeignKey(ApiUser, on_delete=models.PROTECT)
+    permission = models.ForeignKey(Permission, on_delete=models.PROTECT)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=['user', 'permission'], name='unique_individual_permission')]
 
 
 class AccessToken(models.Model):
@@ -32,6 +65,7 @@ class TokenThrottle(models.Model):
 
 
 class Schedule(models.Model):
+    owner = models.ForeignKey(ApiUser, on_delete=models.PROTECT)
     time = models.TimeField()
     timezone = models.CharField(max_length=100)
     active = models.BooleanField(default=True)
@@ -41,11 +75,13 @@ class Schedule(models.Model):
     created_by = models.CharField(max_length=100)
 
     class Meta:
-        constraints = [models.UniqueConstraint(fields=['time', 'timezone'],
+        constraints = [models.UniqueConstraint(fields=['owner', 'time', 'timezone'],
                        condition=Q(deleted_at__isnull=True), name='unique_live_schedule')]
 
 
 class SyncRun(models.Model):
+    owner = models.ForeignKey(ApiUser, on_delete=models.PROTECT)
+    provider_version = models.PositiveIntegerField(default=0)
     id = models.UUIDField(primary_key=True)
     source = models.CharField(max_length=10)
     actor = models.CharField(max_length=100)
@@ -69,11 +105,15 @@ class SyncRun(models.Model):
 
 
 class Event(models.Model):
-    external_id = models.CharField(max_length=200, unique=True)
+    owner = models.ForeignKey(ApiUser, on_delete=models.PROTECT)
+    external_id = models.CharField(max_length=200)
     version = models.PositiveIntegerField(default=0)
     fingerprint = models.CharField(max_length=64, blank=True)
     data = models.JSONField(default=dict)
     updated_at = models.DateTimeField(default=django_timezone.now)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=['owner', 'external_id'], name='unique_owner_event')]
 
 
 class EventVersion(models.Model):
@@ -89,6 +129,7 @@ class EventVersion(models.Model):
 
 
 class AuditLog(models.Model):
+    owner_identifier = models.UUIDField(null=True, db_index=True)
     interaction_id = models.UUIDField(db_index=True)
     created_at = models.DateTimeField(default=django_timezone.now, db_index=True)
     actor = models.CharField(max_length=100)
@@ -100,6 +141,7 @@ class AuditLog(models.Model):
 
 
 class ApiRequestLog(models.Model):
+    owner_identifier = models.UUIDField(null=True, db_index=True)
     interaction_id = models.UUIDField(unique=True)
     started_at = models.DateTimeField(default=django_timezone.now)
     finished_at = models.DateTimeField()
