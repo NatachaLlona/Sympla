@@ -32,21 +32,23 @@ def ensure_catalog():
             role.permissions.set(codes)
 
 
-def effective_permissions(user):
-    if not user.is_active or user.deleted_at:
+def effective_permissions(api_account):
+    if not api_account.is_active or api_account.deleted_at:
         return set()
-    if user.is_superuser:
+    if api_account.is_superuser:
         return set(PERMISSIONS)
     role = (
-        set(user.role.permissions.values_list("code", flat=True))
-        if user.role_id
+        set(api_account.role.permissions.values_list("code", flat=True))
+        if api_account.role_id
         else set()
     )
     direct = set(
-        AccessRule.objects.filter(user=user).values_list("permission_id", flat=True)
+        AccessRule.objects.filter(api_account=api_account).values_list(
+            "permission_id", flat=True
+        )
     )
     return role | direct
 
 
-def permitted(user, permission):
-    return permission in effective_permissions(user)
+def permitted(api_account, permission):
+    return permission in effective_permissions(api_account)

@@ -12,7 +12,9 @@ from .password_policy import valid_password
 
 class ClientCredentialsTests(TestCase):
     def setUp(self):
-        self.user = configure_client("test-client", "ClientSecret1!", can_write=True)
+        self.api_account = configure_client(
+            "test-client", "ClientSecret1!", can_write=True
+        )
 
     def issue(self, **changes):
         return self.client.post(
@@ -79,7 +81,13 @@ class ClientCredentialsTests(TestCase):
         self.assertEqual(result.status_code, 200)
 
     def test_bad_credentials_grants_and_throttling(self):
-        self.assertEqual(self.issue(client_secret="incorrect").status_code, 401)
+        invalid = self.issue(client_secret="incorrect")
+        self.assertEqual(invalid.status_code, 401)
+        self.assertNotIn("Basic", invalid.get("WWW-Authenticate", ""))
+        self.assertEqual(
+            invalid.json()["error_description"],
+            "Invalid API client ID or API client secret.",
+        )
         self.assertEqual(self.issue(client_id="missing").status_code, 401)
         self.assertEqual(self.issue(grant_type="password").status_code, 400)
         self.assertEqual(self.issue(scope="admin").status_code, 400)
@@ -90,8 +98,8 @@ class ClientCredentialsTests(TestCase):
 
     def test_legacy_static_tokens_are_not_accepted(self):
         legacy = "legacy-token-never-a-real-credential"
-        self.user.token_hash = hashlib.sha256(legacy.encode()).hexdigest()
-        self.user.save()
+        self.api_account.token_hash = hashlib.sha256(legacy.encode()).hexdigest()
+        self.api_account.save()
         self.assertEqual(
             self.client.get(
                 "/api/v1/events/", HTTP_AUTHORIZATION="Bearer " + legacy

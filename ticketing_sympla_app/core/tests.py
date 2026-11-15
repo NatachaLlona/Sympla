@@ -10,7 +10,17 @@ from io import StringIO
 from django.test import TestCase, TransactionTestCase, override_settings
 from django.utils import timezone
 from django.contrib.auth.hashers import make_password
-from .models import ApiUser, AccessToken, Schedule, SyncRun, Event, EventVersion, AuditLog, ApiRequestLog, Coordinator
+from .models import (
+    ApiUser,
+    AccessToken,
+    Schedule,
+    SyncRun,
+    Event,
+    EventVersion,
+    AuditLog,
+    ApiRequestLog,
+    Coordinator,
+)
 from .scheduling import next_occurrence
 from .services import enqueue, enqueue_due, process_one, claim_run, persist_events
 from .sympla import fetch_events, SyncError
@@ -18,179 +28,310 @@ from .credentials import configure_client
 from .models import Role
 
 
-@override_settings(SYMPLA_API_KEY='test-placeholder-not-real')
+@override_settings(SYMPLA_API_KEY="test-placeholder-not-real")
 class ApiTests(TestCase):
     def setUp(self):
-        self.token = 'test-token-that-is-never-a-real-credential'
-        self.user = configure_client('writer', 'Testing1!', can_write=True, sympla_token='test-placeholder-not-real')
-        AccessToken.objects.create(user=self.user, credential_version=self.user.credential_version,
-            expires_at=timezone.now() + timedelta(hours=1), token_hash=hashlib.sha256(self.token.encode()).hexdigest())
-        self.headers = {'HTTP_AUTHORIZATION': 'Bearer ' + self.token}
+        self.token = "test-token-that-is-never-a-real-credential"
+        self.api_account = configure_client(
+            "writer",
+            "Testing1!",
+            can_write=True,
+            sympla_token="test-placeholder-not-real",
+        )
+        AccessToken.objects.create(
+            api_account=self.api_account,
+            credential_version=self.api_account.credential_version,
+            expires_at=timezone.now() + timedelta(hours=1),
+            token_hash=hashlib.sha256(self.token.encode()).hexdigest(),
+        )
+        self.headers = {"HTTP_AUTHORIZATION": "Bearer " + self.token}
 
     def post(self, path, data):
-        return self.client.post(path, json.dumps(data), content_type='application/json', **self.headers)
+        return self.client.post(
+            path, json.dumps(data), content_type="application/json", **self.headers
+        )
 
     def test_authentication_revocation_and_readonly(self):
-        self.assertEqual(self.client.get('/api/v1/schedules/').status_code, 401)
-        self.user.role = Role.objects.get(name='reader')
-        self.user.save()
-        self.assertEqual(self.post('/api/v1/sync/', {}).status_code, 403)
-        self.assertEqual(self.client.get('/api/v1/events/', **self.headers).status_code, 200)
-        self.user.is_active = False
-        self.user.save()
-        self.assertEqual(self.client.get('/api/v1/events/', **self.headers).status_code, 401)
+        self.assertEqual(self.client.get("/api/v1/schedules/").status_code, 401)
+        self.api_account.role = Role.objects.get(name="reader")
+        self.api_account.save()
+        self.assertEqual(self.post("/api/v1/sync/", {}).status_code, 403)
+        self.assertEqual(
+            self.client.get("/api/v1/events/", **self.headers).status_code, 200
+        )
+        self.api_account.is_active = False
+        self.api_account.save()
+        self.assertEqual(
+            self.client.get("/api/v1/events/", **self.headers).status_code, 401
+        )
         self.assertNotIn(self.token, str(list(ApiRequestLog.objects.values())))
 
     def test_schedule_crud_and_validation(self):
-        payload = {'time': '09:30', 'timezone': 'Europe/Lisbon', 'active': True}
-        result = self.post('/api/v1/schedules/', payload)
+        payload = {"time": "09:30", "timezone": "Europe/Lisbon", "active": True}
+        result = self.post("/api/v1/schedules/", payload)
         self.assertEqual(result.status_code, 201, result.content)
-        item_id = result.json()['id']
-        self.assertEqual(self.post('/api/v1/schedules/', payload).status_code, 409)
-        self.assertEqual(self.post('/api/v1/schedules/', {**payload, 'time': '29:00'}).status_code, 400)
-        self.assertEqual(self.post('/api/v1/schedules/', {**payload, 'timezone': 'bad-zone'}).status_code, 400)
-        self.assertEqual(self.post('/api/v1/schedules/', {**payload, 'active': 'true'}).status_code, 400)
-        self.assertEqual(self.post('/api/v1/schedules/', {**payload, 'unknown': 1}).status_code, 400)
-        self.assertEqual(self.client.get('/api/v1/schedules/?active=true', **self.headers).json()['count'], 1)
-        result = self.client.patch(f'/api/v1/schedules/{item_id}/', json.dumps({'active': False}),
-                                   content_type='application/json', **self.headers)
+        item_id = result.json()["id"]
+        self.assertEqual(self.post("/api/v1/schedules/", payload).status_code, 409)
+        self.assertEqual(
+            self.post("/api/v1/schedules/", {**payload, "time": "29:00"}).status_code,
+            400,
+        )
+        self.assertEqual(
+            self.post(
+                "/api/v1/schedules/", {**payload, "timezone": "bad-zone"}
+            ).status_code,
+            400,
+        )
+        self.assertEqual(
+            self.post("/api/v1/schedules/", {**payload, "active": "true"}).status_code,
+            400,
+        )
+        self.assertEqual(
+            self.post("/api/v1/schedules/", {**payload, "unknown": 1}).status_code, 400
+        )
+        self.assertEqual(
+            self.client.get("/api/v1/schedules/?active=true", **self.headers).json()[
+                "count"
+            ],
+            1,
+        )
+        result = self.client.patch(
+            f"/api/v1/schedules/{item_id }/",
+            json.dumps({"active": False}),
+            content_type="application/json",
+            **self.headers,
+        )
         self.assertEqual(result.status_code, 200)
-        self.assertIsNone(result.json()['next_run_at'])
-        self.assertEqual(self.client.delete(f'/api/v1/schedules/{item_id}/', **self.headers).status_code, 204)
-        self.assertEqual(self.client.get('/api/v1/schedules/', **self.headers).json()['count'], 0)
-        self.assertEqual(AuditLog.objects.filter(resource='schedule').count(), 3)
+        self.assertIsNone(result.json()["next_run_at"])
+        self.assertEqual(
+            self.client.delete(
+                f"/api/v1/schedules/{item_id }/", **self.headers
+            ).status_code,
+            204,
+        )
+        self.assertEqual(
+            self.client.get("/api/v1/schedules/", **self.headers).json()["count"], 0
+        )
+        self.assertEqual(AuditLog.objects.filter(resource="schedule").count(), 3)
 
     def test_manual_queue_and_removed_unsafe_route(self):
-        self.assertEqual(self.client.get('/update/').status_code, 404)
-        self.assertEqual(self.client.get('/api/v1/sync/', **self.headers).status_code, 405)
-        self.assertEqual(self.post('/api/v1/sync/', {}).status_code, 202)
-        self.assertEqual(self.post('/api/v1/sync/', {}).status_code, 409)
-        self.assertEqual(SyncRun.objects.get().source, 'manual')
-        self.assertEqual(self.client.get('/api/v1/sync-runs/', **self.headers).json()['count'], 1)
+        self.assertEqual(self.client.get("/update/").status_code, 404)
+        self.assertEqual(
+            self.client.get("/api/v1/sync/", **self.headers).status_code, 405
+        )
+        self.assertEqual(self.post("/api/v1/sync/", {}).status_code, 202)
+        self.assertEqual(self.post("/api/v1/sync/", {}).status_code, 409)
+        self.assertEqual(SyncRun.objects.get().source, "manual")
+        self.assertEqual(
+            self.client.get("/api/v1/sync-runs/", **self.headers).json()["count"], 1
+        )
 
-    @override_settings(SYMPLA_API_KEY='')
+    @override_settings(SYMPLA_API_KEY="")
     def test_missing_provider_token_returns_actionable_error_without_queuing(self):
-        self.user.sympla_token_encrypted = ''
-        self.user.save(update_fields=['sympla_token_encrypted'])
-        result = self.post('/api/v1/sync/', {})
+        self.api_account.sympla_token_encrypted = ""
+        self.api_account.save(update_fields=["sympla_token_encrypted"])
+        result = self.post("/api/v1/sync/", {})
         self.assertEqual(result.status_code, 503)
-        self.assertEqual(result.json()['error'], 'upstream_configuration')
-        self.assertIn('--configure-sympla', result.json()['message'])
+        self.assertEqual(result.json()["error"], "upstream_configuration")
+        self.assertIn("--configure-sympla", result.json()["message"])
         self.assertFalse(SyncRun.objects.exists())
 
     def test_manual_response_links_to_execution_status(self):
-        result = self.post('/api/v1/sync/', {})
-        response = self.client.get(result.json()['status_url'], **self.headers)
+        result = self.post("/api/v1/sync/", {})
+        response = self.client.get(result.json()["status_url"], **self.headers)
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json()['id'], result.json()['id'])
-        self.assertEqual(response.json()['status'], 'queued')
-        self.assertIn('error_details', response.json())
+        self.assertEqual(response.json()["id"], result.json()["id"])
+        self.assertEqual(response.json()["status"], "queued")
+        self.assertIn("error_details", response.json())
 
     def test_schedule_delete_cancels_only_queued(self):
-        result = self.post('/api/v1/schedules/', {'time': '09:30', 'timezone': 'UTC'})
-        schedule = Schedule.objects.get(pk=result.json()['id'])
+        result = self.post("/api/v1/schedules/", {"time": "09:30", "timezone": "UTC"})
+        schedule = Schedule.objects.get(pk=result.json()["id"])
         with transaction.atomic():
-            run = enqueue('scheduler', source='scheduled', schedule=schedule, scheduled_for=timezone.now())
-        self.client.delete(f'/api/v1/schedules/{schedule.pk}/', **self.headers)
+            run = enqueue(
+                "scheduler",
+                source="scheduled",
+                schedule=schedule,
+                scheduled_for=timezone.now(),
+            )
+        self.client.delete(f"/api/v1/schedules/{schedule .pk }/", **self.headers)
         run.refresh_from_db()
-        self.assertEqual(run.status, 'cancelled')
+        self.assertEqual(run.status, "cancelled")
 
     def test_business_and_audit_rollback_together(self):
-        with patch('core.views.audit', side_effect=RuntimeError('secret-do-not-expose')):
-            result = self.post('/api/v1/schedules/', {'time': '09:30', 'timezone': 'UTC'})
+        with patch(
+            "core.views.audit", side_effect=RuntimeError("secret-do-not-expose")
+        ):
+            result = self.post(
+                "/api/v1/schedules/", {"time": "09:30", "timezone": "UTC"}
+            )
         self.assertEqual(result.status_code, 500)
-        self.assertNotIn(b'secret-do-not-expose', result.content)
+        self.assertNotIn(b"secret-do-not-expose", result.content)
         self.assertFalse(Schedule.objects.exists())
         self.assertEqual(ApiRequestLog.objects.get().http_status, 500)
 
     def test_audit_readonly_and_pagination(self):
-        self.assertEqual(self.post('/api/v1/audit-logs/', {}).status_code, 405)
-        self.assertEqual(self.client.get('/api/v1/events/?page_size=1000', **self.headers).status_code, 400)
-        self.assertEqual(self.client.get('/api/v1/events/999/versions/', **self.headers).status_code, 404)
+        self.assertEqual(self.post("/api/v1/audit-logs/", {}).status_code, 405)
+        self.assertEqual(
+            self.client.get(
+                "/api/v1/events/?page_size=1000", **self.headers
+            ).status_code,
+            400,
+        )
+        self.assertEqual(
+            self.client.get("/api/v1/events/999/versions/", **self.headers).status_code,
+            404,
+        )
 
-    @patch('core.services.fetch_events', return_value=[{'id': 'integration-event', 'name': 'Imported'}])
+    @patch(
+        "core.services.fetch_events",
+        return_value=[{"id": "integration-event", "name": "Imported"}],
+    )
     def test_api_to_worker_to_history(self, fetch):
-        self.assertEqual(self.post('/api/v1/sync/', {}).status_code, 202)
+        self.assertEqual(self.post("/api/v1/sync/", {}).status_code, 202)
         # TestCase owns a transaction; a real worker owns its own connection/process.
-        with patch('core.management.commands.sync_worker.close_old_connections'):
-            call_command('sync_worker', once=True, stdout=StringIO())
-        result = self.client.get('/api/v1/events/', **self.headers).json()['results'][0]
-        self.assertEqual(result['data']['name'], 'Imported')
-        history = self.client.get(f"/api/v1/events/{result['id']}/versions/", **self.headers).json()
-        self.assertEqual(history['count'], 1)
-        self.assertEqual(self.client.get('/api/v1/audit-logs/?resource=event', **self.headers).json()['count'], 1)
+        with patch("core.management.commands.sync_worker.close_old_connections"):
+            call_command("sync_worker", once=True, stdout=StringIO())
+        result = self.client.get("/api/v1/events/", **self.headers).json()["results"][0]
+        self.assertEqual(result["data"]["name"], "Imported")
+        history = self.client.get(
+            f"/api/v1/events/{result ['id']}/versions/", **self.headers
+        ).json()
+        self.assertEqual(history["count"], 1)
+        self.assertEqual(
+            self.client.get(
+                "/api/v1/audit-logs/?resource=event", **self.headers
+            ).json()["count"],
+            1,
+        )
 
     def test_user_rotation_and_revocation_commands(self):
         output = StringIO()
-        with patch('core.management.commands.api_user.getpass.getpass', return_value='Testing1!'):
-            call_command('api_user', 'create', 'command-user', write=True, stdout=output)
-        original = self.client.post('/api/v1/token/', {'grant_type': 'client_credentials',
-            'client_id': 'command-user', 'client_secret': 'Testing1!'}, content_type='application/json').json()['access_token']
+        with patch(
+            "core.management.commands.api_user.getpass.getpass",
+            return_value="Testing1!",
+        ):
+            call_command(
+                "api_user", "create", "command-user", write=True, stdout=output
+            )
+        original = self.client.post(
+            "/api/v1/token/",
+            {
+                "grant_type": "client_credentials",
+                "client_id": "command-user",
+                "client_secret": "Testing1!",
+            },
+            content_type="application/json",
+        ).json()["access_token"]
         output = StringIO()
-        with patch('core.management.commands.api_user.getpass.getpass', return_value='Rotated1!'):
-            call_command('api_user', 'rotate', 'command-user', stdout=output)
-        replacement = self.client.post('/api/v1/token/', {'grant_type': 'client_credentials',
-            'client_id': 'command-user', 'client_secret': 'Rotated1!'}, content_type='application/json').json()['access_token']
+        with patch(
+            "core.management.commands.api_user.getpass.getpass",
+            return_value="Rotated1!",
+        ):
+            call_command("api_user", "rotate", "command-user", stdout=output)
+        replacement = self.client.post(
+            "/api/v1/token/",
+            {
+                "grant_type": "client_credentials",
+                "client_id": "command-user",
+                "client_secret": "Rotated1!",
+            },
+            content_type="application/json",
+        ).json()["access_token"]
         self.assertNotEqual(original, replacement)
-        self.assertEqual(self.client.get('/api/v1/events/', HTTP_AUTHORIZATION='Bearer ' + original).status_code, 401)
-        self.assertEqual(self.client.get('/api/v1/events/', HTTP_AUTHORIZATION='Bearer ' + replacement).status_code, 200)
-        call_command('api_user', 'revoke', 'command-user', stdout=StringIO())
-        self.assertEqual(self.client.get('/api/v1/events/', HTTP_AUTHORIZATION='Bearer ' + replacement).status_code, 401)
+        self.assertEqual(
+            self.client.get(
+                "/api/v1/events/", HTTP_AUTHORIZATION="Bearer " + original
+            ).status_code,
+            401,
+        )
+        self.assertEqual(
+            self.client.get(
+                "/api/v1/events/", HTTP_AUTHORIZATION="Bearer " + replacement
+            ).status_code,
+            200,
+        )
+        call_command("api_user", "revoke", "command-user", stdout=StringIO())
+        self.assertEqual(
+            self.client.get(
+                "/api/v1/events/", HTTP_AUTHORIZATION="Bearer " + replacement
+            ).status_code,
+            401,
+        )
         self.assertNotIn(replacement, str(list(AuditLog.objects.values())))
 
     def test_scheduled_job_does_not_block_manual_queue(self):
-        enqueue('scheduler', source='scheduled', owner=self.user)
-        self.assertEqual(self.post('/api/v1/sync/', {}).status_code, 202)
+        enqueue("scheduler", source="scheduled", owner=self.api_account)
+        self.assertEqual(self.post("/api/v1/sync/", {}).status_code, 202)
 
     def test_oversized_request_is_rejected(self):
-        result = self.post('/api/v1/schedules/', {'padding': 'x' * 5000})
+        result = self.post("/api/v1/schedules/", {"padding": "x" * 5000})
         self.assertEqual(result.status_code, 413)
 
 
 class SyncTests(TestCase):
     def setUp(self):
-        self.user = configure_client('tester', 'Testing1!', sympla_token='test-provider')
+        self.api_account = configure_client(
+            "tester", "Testing1!", sympla_token="test-provider"
+        )
 
     def queue(self):
-        return enqueue('tester', owner=self.user)
+        return enqueue("tester", owner=self.api_account)
 
-    @patch('core.services.fetch_events')
+    @patch("core.services.fetch_events")
     def test_versioning_and_nested_differences(self, fetch):
-        fetch.return_value = [{'id': 'opaque-id', 'name': 'First', 'address': {'city': 'Lisbon'}, 'token': 'omit'}]
+        fetch.return_value = [
+            {
+                "id": "opaque-id",
+                "name": "First",
+                "address": {"city": "Lisbon"},
+                "token": "omit",
+            }
+        ]
         self.queue()
         run = process_one()
-        self.assertEqual(run.status, 'success')
+        self.assertEqual(run.status, "success")
         self.assertEqual(Event.objects.get().version, 1)
-        self.assertNotIn('token', Event.objects.get().data)
+        self.assertNotIn("token", Event.objects.get().data)
         self.queue()
-        self.assertEqual(process_one().counts['unchanged'], 1)
+        self.assertEqual(process_one().counts["unchanged"], 1)
         self.assertEqual(EventVersion.objects.count(), 1)
-        fetch.return_value = [{'id': 'opaque-id', 'name': 'Second', 'address': {'city': 'Porto'}}]
+        fetch.return_value = [
+            {"id": "opaque-id", "name": "Second", "address": {"city": "Porto"}}
+        ]
         self.queue()
         process_one()
         version = EventVersion.objects.get(version=2)
-        self.assertEqual(version.differences['/address/city']['before'], 'Lisbon')
-        self.assertEqual(version.differences['/address/city']['after'], 'Porto')
-        self.assertEqual(AuditLog.objects.filter(action='event.updated').count(), 1)
+        self.assertEqual(version.differences["/address/city"]["before"], "Lisbon")
+        self.assertEqual(version.differences["/address/city"]["after"], "Porto")
+        self.assertEqual(AuditLog.objects.filter(action="event.updated").count(), 1)
 
-    @patch('core.services.fetch_events')
+    @patch("core.services.fetch_events")
     def test_failure_rolls_back_all_events_and_logs_failure(self, fetch):
-        fetch.return_value = [{'id': 'valid', 'name': 'valid'}, {'id': 'invalid', 'name': {'bad': 'shape'}}]
+        fetch.return_value = [
+            {"id": "valid", "name": "valid"},
+            {"id": "invalid", "name": {"bad": "shape"}},
+        ]
         self.queue()
         run = process_one()
-        self.assertEqual(run.status, 'failed')
-        self.assertTrue(run.error_details['message'])
+        self.assertEqual(run.status, "failed")
+        self.assertTrue(run.error_details["message"])
         self.assertFalse(Event.objects.exists())
         self.assertFalse(EventVersion.objects.exists())
-        self.assertFalse(AuditLog.objects.filter(resource='event').exists())
-        self.assertTrue(AuditLog.objects.filter(action='sync.failed').exists())
+        self.assertFalse(AuditLog.objects.filter(resource="event").exists())
+        self.assertTrue(AuditLog.objects.filter(action="sync.failed").exists())
         self.assertIsNone(run.running_slot)
 
-    @patch('core.services.fetch_events', side_effect=SyncError('upstream_http_error'))
+    @patch("core.services.fetch_events", side_effect=SyncError("upstream_http_error"))
     def test_upstream_failure_preserves_existing_events(self, fetch):
-        Event.objects.create(owner=self.user, external_id='existing', data={'id': 'existing'}, version=1)
+        Event.objects.create(
+            owner=self.api_account,
+            external_id="existing",
+            data={"id": "existing"},
+            version=1,
+        )
         self.queue()
-        self.assertEqual(process_one().error_code, 'upstream_http_error')
+        self.assertEqual(process_one().error_code, "upstream_http_error")
         self.assertEqual(Event.objects.count(), 1)
 
     def test_only_one_running_job(self):
@@ -201,10 +342,22 @@ class SyncTests(TestCase):
 
     def test_due_once_inactive_ignored_and_downtime_coalesced(self):
         now = timezone.now()
-        schedule = Schedule.objects.create(owner=self.user, time=time(9), timezone='UTC', active=True,
-                  next_run_at=now-timedelta(days=3), created_by='tester')
-        Schedule.objects.create(owner=self.user, time=time(10), timezone='UTC', active=False,
-                  next_run_at=now-timedelta(days=3), created_by='tester')
+        schedule = Schedule.objects.create(
+            owner=self.api_account,
+            time=time(9),
+            timezone="UTC",
+            active=True,
+            next_run_at=now - timedelta(days=3),
+            created_by="tester",
+        )
+        Schedule.objects.create(
+            owner=self.api_account,
+            time=time(10),
+            timezone="UTC",
+            active=False,
+            next_run_at=now - timedelta(days=3),
+            created_by="tester",
+        )
         self.assertEqual(enqueue_due(now), 1)
         self.assertEqual(enqueue_due(now), 0)
         self.assertEqual(SyncRun.objects.count(), 1)
@@ -213,21 +366,38 @@ class SyncTests(TestCase):
 
     def test_dst_gap_and_fold(self):
         after = datetime(2026, 3, 29, 0, tzinfo=dt_timezone.utc)
-        self.assertEqual(next_occurrence(time(1, 30), 'Europe/Lisbon', after).date().isoformat(), '2026-03-30')
+        self.assertEqual(
+            next_occurrence(time(1, 30), "Europe/Lisbon", after).date().isoformat(),
+            "2026-03-30",
+        )
         after = datetime(2026, 10, 25, 0, tzinfo=dt_timezone.utc)
-        first = next_occurrence(time(1, 30), 'Europe/Lisbon', after)
+        first = next_occurrence(time(1, 30), "Europe/Lisbon", after)
         self.assertEqual(first.hour, 0)
-        self.assertEqual(next_occurrence(time(1, 30), 'Europe/Lisbon', first).date().isoformat(), '2026-10-26')
+        self.assertEqual(
+            next_occurrence(time(1, 30), "Europe/Lisbon", first).date().isoformat(),
+            "2026-10-26",
+        )
 
     def test_history_is_append_only_at_database_level(self):
-        log = AuditLog.objects.create(interaction_id=uuid.uuid4(), actor='a', action='a', resource='a', target_id='1')
-        for operation in [lambda: AuditLog.objects.filter(pk=log.pk).update(actor='bad'),
-                          lambda: AuditLog.objects.filter(pk=log.pk).delete()]:
+        log = AuditLog.objects.create(
+            interaction_id=uuid.uuid4(),
+            actor="a",
+            action="a",
+            resource="a",
+            target_id="1",
+        )
+        for operation in [
+            lambda: AuditLog.objects.filter(pk=log.pk).update(actor="bad"),
+            lambda: AuditLog.objects.filter(pk=log.pk).delete(),
+        ]:
             with self.assertRaises(DatabaseError), transaction.atomic():
                 operation()
 
 
-@override_settings(SYMPLA_API_HOST='https://api.sympla.com.br/public/v1.6.0', SYMPLA_API_KEY='test-not-real')
+@override_settings(
+    SYMPLA_API_HOST="https://api.sympla.com.br/public/v1.6.0",
+    SYMPLA_API_KEY="test-not-real",
+)
 class FetchTests(TestCase):
     def response(self, data, status=200):
         response = MagicMock()
@@ -236,66 +406,100 @@ class FetchTests(TestCase):
         response.__enter__.return_value = response
         return response
 
-    @patch('core.sympla.requests.Session')
+    @patch("core.sympla.requests.Session")
     def test_has_next_does_not_use_quantity_as_total(self, session):
         client = session.return_value.__enter__.return_value
-        client.get.side_effect = [self.response({'data': [{'id': '1'}], 'pagination': {'quantity': 1, 'has_next': True}}),
-                                  self.response({'data': [{'id': '2'}], 'pagination': {'quantity': 1, 'has_next': False}})]
-        self.assertEqual(len(fetch_events(token='test-not-real')), 2)
-        self.assertFalse(client.get.call_args.kwargs['allow_redirects'])
+        client.get.side_effect = [
+            self.response(
+                {"data": [{"id": "1"}], "pagination": {"quantity": 1, "has_next": True}}
+            ),
+            self.response(
+                {
+                    "data": [{"id": "2"}],
+                    "pagination": {"quantity": 1, "has_next": False},
+                }
+            ),
+        ]
+        self.assertEqual(len(fetch_events(token="test-not-real")), 2)
+        self.assertFalse(client.get.call_args.kwargs["allow_redirects"])
 
-    @patch('core.sympla.requests.Session')
+    @patch("core.sympla.requests.Session")
     def test_cursor_pagination(self, session):
         client = session.return_value.__enter__.return_value
-        client.get.side_effect = [self.response({'data': [{'id': '1'}], 'pagination': {'next_cursor': 'next'}}),
-                                  self.response({'data': [{'id': '2'}], 'pagination': {'next_cursor': None}})]
-        self.assertEqual(len(fetch_events(token='test-not-real')), 2)
-        self.assertEqual(client.get.call_args.kwargs['params']['cursor'], 'next')
+        client.get.side_effect = [
+            self.response(
+                {"data": [{"id": "1"}], "pagination": {"next_cursor": "next"}}
+            ),
+            self.response({"data": [{"id": "2"}], "pagination": {"next_cursor": None}}),
+        ]
+        self.assertEqual(len(fetch_events(token="test-not-real")), 2)
+        self.assertEqual(client.get.call_args.kwargs["params"]["cursor"], "next")
 
-    @patch('core.sympla.requests.Session')
+    @patch("core.sympla.requests.Session")
     def test_terminal_page_can_omit_cursor_and_has_next(self, session):
         client = session.return_value.__enter__.return_value
-        for batch, size in [([{'id': '1'}, {'id': '2'}, {'id': '3'}], 200), ([], 200), ([{'id': '1'}], 1)]:
-            client.get.return_value = self.response({'data': batch, 'pagination': {'quantity': len(batch), 'page_size': size}})
-            self.assertEqual(fetch_events(token='test-not-real'), batch)
+        for batch, size in [
+            ([{"id": "1"}, {"id": "2"}, {"id": "3"}], 200),
+            ([], 200),
+            ([{"id": "1"}], 1),
+        ]:
+            client.get.return_value = self.response(
+                {
+                    "data": batch,
+                    "pagination": {"quantity": len(batch), "page_size": size},
+                }
+            )
+            self.assertEqual(fetch_events(token="test-not-real"), batch)
 
-    @patch('core.sympla.requests.Session')
+    @patch("core.sympla.requests.Session")
     def test_http_error_preserves_only_safe_status_and_page(self, session):
-        session.return_value.__enter__.return_value.get.return_value = self.response({'secret': 'never-log'}, 401)
+        session.return_value.__enter__.return_value.get.return_value = self.response(
+            {"secret": "never-log"}, 401
+        )
         with self.assertRaises(SyncError) as error:
-            fetch_events(token='test-not-real')
-        self.assertEqual(error.exception.details, {'upstream_http_status': 401, 'page': 1})
-        self.assertNotIn('never-log', str(error.exception))
+            fetch_events(token="test-not-real")
+        self.assertEqual(
+            error.exception.details, {"upstream_http_status": 401, "page": 1}
+        )
+        self.assertNotIn("never-log", str(error.exception))
 
-    @patch('core.sympla.requests.Session')
+    @patch("core.sympla.requests.Session")
     def test_invalid_pagination_redirect_and_duplicates(self, session):
         client = session.return_value.__enter__.return_value
-        for response in [self.response({}, 302), self.response({'data': [], 'pagination': {'has_next': True}}),
-                         self.response({'data': [{'id': '1'}, {'id': '1'}], 'pagination': {'has_next': False}})]:
+        for response in [
+            self.response({}, 302),
+            self.response({"data": [], "pagination": {"has_next": True}}),
+            self.response(
+                {"data": [{"id": "1"}, {"id": "1"}], "pagination": {"has_next": False}}
+            ),
+        ]:
             client.get.side_effect = None
             client.get.return_value = response
             with self.assertRaises(SyncError):
-                fetch_events(token='test-not-real')
+                fetch_events(token="test-not-real")
 
-    @override_settings(SYMPLA_API_HOST='https://attacker.example')
-    @patch('core.sympla.requests.Session')
+    @override_settings(SYMPLA_API_HOST="https://attacker.example")
+    @patch("core.sympla.requests.Session")
     def test_disallowed_host_never_receives_token(self, session):
         with self.assertRaises(SyncError):
-            fetch_events(token='test-not-real')
+            fetch_events(token="test-not-real")
         session.assert_not_called()
 
 
 class PostgresConcurrencyTests(TransactionTestCase):
     def setUp(self):
-        if connection.vendor != 'postgresql':
-            self.skipTest('Real row locks require PostgreSQL')
+        if connection.vendor != "postgresql":
+            self.skipTest("Real row locks require PostgreSQL")
         Coordinator.objects.get_or_create(pk=1)
-        self.user = configure_client('concurrent', 'Testing1!', sympla_token='test-provider')
+        self.api_account = configure_client(
+            "concurrent", "Testing1!", sympla_token="test-provider"
+        )
 
     def test_two_workers_claim_only_one_global_slot(self):
         with transaction.atomic():
-            enqueue('one', owner=self.user)
-            enqueue('two', owner=self.user)
+            enqueue("one", owner=self.api_account)
+            enqueue("two", owner=self.api_account)
+
         def claim():
             close_old_connections()
             try:
@@ -303,21 +507,30 @@ class PostgresConcurrencyTests(TransactionTestCase):
                 return str(run.pk) if run else None
             finally:
                 close_old_connections()
+
         with ThreadPoolExecutor(max_workers=2) as pool:
             results = list(pool.map(lambda _: claim(), range(2)))
         self.assertEqual(sum(result is not None for result in results), 1)
-        self.assertEqual(SyncRun.objects.filter(status='running').count(), 1)
+        self.assertEqual(SyncRun.objects.filter(status="running").count(), 1)
 
     def test_two_schedulers_enqueue_only_one_occurrence(self):
         now = timezone.now()
-        Schedule.objects.create(owner=self.user, time=time(9), timezone='UTC', active=True,
-            next_run_at=now-timedelta(minutes=1), created_by='tester')
+        Schedule.objects.create(
+            owner=self.api_account,
+            time=time(9),
+            timezone="UTC",
+            active=True,
+            next_run_at=now - timedelta(minutes=1),
+            created_by="tester",
+        )
+
         def tick():
             close_old_connections()
             try:
                 return enqueue_due(now)
             finally:
                 close_old_connections()
+
         with ThreadPoolExecutor(max_workers=2) as pool:
             results = list(pool.map(lambda _: tick(), range(2)))
         self.assertEqual(sorted(results), [0, 1])

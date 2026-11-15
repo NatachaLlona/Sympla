@@ -134,14 +134,16 @@ def ask_password(label):
 def secure_directory(directory):
     directory.mkdir(parents=True, exist_ok=True)
     if os.name == "nt":
-        user = subprocess.check_output(["whoami"], text=True).strip()
+        operating_system_account = subprocess.check_output(
+            ["whoami"], text=True
+        ).strip()
         result = subprocess.run(
             [
                 "icacls",
                 str(directory),
                 "/inheritance:r",
                 "/grant:r",
-                user + ":(OI)(CI)F",
+                operating_system_account + ":(OI)(CI)F",
                 "SYSTEM:(OI)(CI)F",
             ],
             capture_output=True,
@@ -230,8 +232,8 @@ def main(argv=None):
         run(["docker", "compose", "version"], quiet=True)
         if args.check:
             print(
-                f"Configuration valid. Database: {config['database']['name']}; PostgreSQL port: "
-                f"{config['database']['port']}; API port: {config['api']['port']}."
+                f"Configuration valid. Database: {config ['database']['name']}; PostgreSQL port: "
+                f"{config ['database']['port']}; API port: {config ['api']['port']}."
             )
             print(
                 "Docker is available. Run python start.py for first-time credential setup."
@@ -268,21 +270,21 @@ def main(argv=None):
             print(
                 "First-time setup. Credentials are separate for PostgreSQL and the API client."
             )
-            username = ask_identifier(
-                "Database username: ",
+            database_account_name = ask_identifier(
+                "database account name: ",
                 r"[a-z][a-z0-9_]{2,62}",
-                "Username must start with a lowercase letter and contain 3 to 63 lowercase letters, digits or underscores.",
+                "Database account name must start with a lowercase letter and contain 3 to 63 lowercase letters, digits or underscores.",
             )
-            while username in {"postgres", "sympla_admin"}:
-                print("That database username is reserved.")
-                username = ask_identifier(
-                    "Database username: ",
+            while database_account_name in {"postgres", "sympla_admin"}:
+                print("That database account name is reserved.")
+                database_account_name = ask_identifier(
+                    "database account name: ",
                     r"[a-z][a-z0-9_]{2,62}",
-                    "Invalid database username.",
+                    "Invalid database account name.",
                 )
             password = ask_password("Database password")
             client_id = ask_identifier(
-                "API client ID (API username): ",
+                "API client ID (API account name): ",
                 r"[A-Za-z0-9_.-]{3,100}",
                 "Client ID must contain 3 to 100 letters, digits, dots, underscores or hyphens.",
             )
@@ -301,7 +303,7 @@ def main(argv=None):
                 write_file(state_dir / name, value)
             state = {
                 "database_name": config["database"]["name"],
-                "database_user": username,
+                "database_user": database_account_name,
                 "project_name": config["docker"]["project_name"],
                 "client_id": client_id,
                 "client_setup_pending": True,
@@ -350,16 +352,16 @@ def main(argv=None):
         run(base + ["run", "--rm", "--no-deps", "bootstrap"], env)
         # The API client secret is only needed to create/rotate its password hash.
         write_file(state_dir / "client_secret", "")
-        write_file(state_dir / 'sympla_api_key', '')
+        write_file(state_dir / "sympla_api_key", "")
         state["client_setup_pending"] = False
         write_file(state_path, json.dumps(state, indent=2))
         app_up = ["up", "--detach", "--wait"]
         if args.configure_sympla:
             app_up.append("--force-recreate")
         run(base + app_up + ["api", "worker"], env)
-        print(f"Ready. Swagger: http://127.0.0.1:{config['api']['port']}/docs/")
+        print(f"Ready. Swagger: http://127.0.0.1:{config ['api']['port']}/docs/")
         print(
-            f"Client ID: {state['client_id']}. Use your client secret in Swagger Authorize."
+            f"Client ID: {state ['client_id']}. Use your client secret in Swagger Authorize."
         )
         print("The worker is running in Docker. You may close this terminal.")
         return 0

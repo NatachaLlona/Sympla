@@ -6,6 +6,7 @@ import uuid
 
 class Coordinator(models.Model):
     """Singleton row for short queue/schedule transactions, never external HTTP calls."""
+
     pass
 
 
@@ -24,13 +25,15 @@ class Role(models.Model):
 
 class ApiUser(models.Model):
     identifier = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
-    credential_identifier = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
+    credential_identifier = models.UUIDField(
+        default=uuid.uuid4, unique=True, editable=False
+    )
     role = models.ForeignKey(Role, null=True, on_delete=models.PROTECT)
     is_superuser = models.BooleanField(default=False)
     deleted_at = models.DateTimeField(null=True)
     sympla_token_encrypted = models.TextField(blank=True)
     provider_version = models.PositiveIntegerField(default=1)
-    username = models.CharField(max_length=100, unique=True)
+    client_id = models.CharField(max_length=100, unique=True, db_column="username")
     token_hash = models.CharField(max_length=64, unique=True, null=True)
     client_secret_hash = models.CharField(max_length=256, blank=True)
     credential_version = models.PositiveIntegerField(default=1)
@@ -39,21 +42,36 @@ class ApiUser(models.Model):
     created_at = models.DateTimeField(default=django_timezone.now)
 
     class Meta:
-        constraints = [models.UniqueConstraint(fields=['is_superuser'], condition=Q(is_superuser=True), name='one_bootstrap_master')]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["is_superuser"],
+                condition=Q(is_superuser=True),
+                name="one_bootstrap_master",
+            )
+        ]
 
 
 class AccessRule(models.Model):
     identifier = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
-    user = models.ForeignKey(ApiUser, on_delete=models.PROTECT)
+    api_account = models.ForeignKey(
+        ApiUser, on_delete=models.PROTECT, db_column="user_id"
+    )
     permission = models.ForeignKey(Permission, on_delete=models.PROTECT)
 
     class Meta:
-        constraints = [models.UniqueConstraint(fields=['user', 'permission'], name='unique_individual_permission')]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["api_account", "permission"],
+                name="unique_individual_permission",
+            )
+        ]
 
 
 class AccessToken(models.Model):
     token_hash = models.CharField(max_length=64, unique=True)
-    user = models.ForeignKey(ApiUser, on_delete=models.CASCADE)
+    api_account = models.ForeignKey(
+        ApiUser, on_delete=models.CASCADE, db_column="user_id"
+    )
     credential_version = models.PositiveIntegerField()
     expires_at = models.DateTimeField(db_index=True)
 
@@ -75,8 +93,13 @@ class Schedule(models.Model):
     created_by = models.CharField(max_length=100)
 
     class Meta:
-        constraints = [models.UniqueConstraint(fields=['owner', 'time', 'timezone'],
-                       condition=Q(deleted_at__isnull=True), name='unique_live_schedule')]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["owner", "time", "timezone"],
+                condition=Q(deleted_at__isnull=True),
+                name="unique_live_schedule",
+            )
+        ]
 
 
 class SyncRun(models.Model):
@@ -87,7 +110,7 @@ class SyncRun(models.Model):
     actor = models.CharField(max_length=100)
     schedule = models.ForeignKey(Schedule, null=True, on_delete=models.PROTECT)
     scheduled_for = models.DateTimeField(null=True)
-    status = models.CharField(max_length=12, default='queued', db_index=True)
+    status = models.CharField(max_length=12, default="queued", db_index=True)
     created_at = models.DateTimeField(default=django_timezone.now)
     started_at = models.DateTimeField(null=True)
     finished_at = models.DateTimeField(null=True)
@@ -98,9 +121,16 @@ class SyncRun(models.Model):
 
     class Meta:
         constraints = [
-            models.UniqueConstraint(fields=['schedule', 'scheduled_for'], name='unique_schedule_occurrence'),
-            models.CheckConstraint(condition=(Q(status='running', running_slot=1, running_slot__isnull=False) |
-                (~Q(status='running') & Q(running_slot__isnull=True))), name='valid_running_slot'),
+            models.UniqueConstraint(
+                fields=["schedule", "scheduled_for"], name="unique_schedule_occurrence"
+            ),
+            models.CheckConstraint(
+                condition=(
+                    Q(status="running", running_slot=1, running_slot__isnull=False)
+                    | (~Q(status="running") & Q(running_slot__isnull=True))
+                ),
+                name="valid_running_slot",
+            ),
         ]
 
 
@@ -113,11 +143,15 @@ class Event(models.Model):
     updated_at = models.DateTimeField(default=django_timezone.now)
 
     class Meta:
-        constraints = [models.UniqueConstraint(fields=['owner', 'external_id'], name='unique_owner_event')]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["owner", "external_id"], name="unique_owner_event"
+            )
+        ]
 
 
 class EventVersion(models.Model):
-    event = models.ForeignKey(Event, on_delete=models.PROTECT, related_name='versions')
+    event = models.ForeignKey(Event, on_delete=models.PROTECT, related_name="versions")
     version = models.PositiveIntegerField()
     data = models.JSONField()
     differences = models.JSONField()
@@ -125,7 +159,11 @@ class EventVersion(models.Model):
     created_at = models.DateTimeField(default=django_timezone.now)
 
     class Meta:
-        constraints = [models.UniqueConstraint(fields=['event', 'version'], name='unique_event_version')]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["event", "version"], name="unique_event_version"
+            )
+        ]
 
 
 class AuditLog(models.Model):
@@ -137,7 +175,7 @@ class AuditLog(models.Model):
     resource = models.CharField(max_length=50)
     target_id = models.CharField(max_length=200)
     differences = models.JSONField(default=dict)
-    outcome = models.CharField(max_length=20, default='committed')
+    outcome = models.CharField(max_length=20, default="committed")
 
 
 class ApiRequestLog(models.Model):

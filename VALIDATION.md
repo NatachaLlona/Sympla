@@ -1,4 +1,4 @@
-﻿# Validation
+# Validation
 
 The application is started with start.py, running PostgreSQL, API and worker in Docker.
 ANALISE.md describes the imported prototype and is historical.
@@ -21,7 +21,7 @@ docker run --rm --env DJANGO_SECRET_KEY=isolated-test-key-at-least-fifty-charact
 ```
 
 For PostgreSQL tests, add TEST_POSTGRES_HOST=host.docker.internal and TEST_POSTGRES_PORT=55439.
-The fixture expects disposable database/user sympla_qa and password disposable-local-qa-only, with
+The fixture expects disposable database/API account sympla_qa and password disposable-local-qa-only, with
 permission to create/drop test databases. Django creates/drops test_sympla_qa. These fixture values
 must never be deployment credentials.
 
@@ -32,7 +32,7 @@ restricted DB role permissions, and shutdown without deleting data. An empty pro
 no live Sympla request: the test job ends with the expected upstream_configuration failure.
 
 This owned QA stack uses project sympla-startup-qa, database port 25424, API port 18010 and .qa-local/.
-Its sample passwords belong exclusively to disposable QA infrastructure. It never targets the user's
+Its sample passwords belong exclusively to disposable QA infrastructure. It never targets the API account's
 Simpla database/port 2424 or normal client credentials. CI runs both the suite and the launcher check.
 
 Build contexts exclude .env files, SQLite files, .local secrets, QA state and Git metadata.
@@ -52,7 +52,7 @@ uses only mocks or disposable infrastructure. Regression suite: 39 tests passed 
 
 RBAC regression coverage: protected bootstrap master, UUID identity lookup/alias, role lifecycle,
 independent permission enforcement, individual grants, client issue/revoke, deactivation, access-token
-invalidation, encrypted/write-only provider credentials, cross-user access denial, no global fallback,
+invalidation, encrypted/write-only provider credentials, cross-API account access denial, no global fallback,
 and stale-import rollback after provider changes. The Docker launcher additionally provisions a
 read-only ordinary client and verifies its provider configuration and inability to trigger imports.
 Legacy upgrade checks preserve records and separate the ownership backfill from NOT NULL DDL to
@@ -61,5 +61,11 @@ avoid PostgreSQL deferred-FK trigger conflicts. All 51 tests passed on Python 3.
 Live upgrade verification: a private pre-upgrade database backup was saved. The running stack preserved
 3 events, 3 versions, 9 schedules and 12 historical runs and assigned their ownership to the master.
 The API no longer has a global provider token configured; the master provider credential is encrypted.
-The public Swagger schema exposes Identity/Authorization, the UUID lookup alias, mandatory per-user
-provider token input and the four permission codes. No QA users were created in the normal instance.
+The public Swagger schema exposes Identity/Authorization, the UUID lookup alias, mandatory per-API account
+provider token input and the four permission codes. No QA API accounts were created in the normal instance.
+
+Swagger native-dialog regression: all 52 tests passed in Python 3.13/PostgreSQL. Checks cover absence
+of Basic challenges on invalid API credentials, omission of cached browser authentication, qualified
+account identifiers and the existing role/ownership flows. A live comparison confirmed every API
+client ID, credential version and chosen-secret hash remained unchanged after the naming migration.
+The Docker launcher test also passed with pre-existing credentials and the unchanged authentication flow.

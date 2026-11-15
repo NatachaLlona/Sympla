@@ -1,4 +1,4 @@
-"""Owned disposable Docker integration test; never targets the configured user stack."""
+"Owned disposable Docker integration test; never targets the configured API account stack."
 
 import importlib.util
 import json
@@ -32,15 +32,29 @@ def main():
         encoding="utf-8",
     )
     args = ["--config", str(config), "--state-dir", str(qa_root / "state")]
-    if not (qa_root / 'state' / 'state.json').exists():
-        with patch('builtins.input', side_effect=['qa_runtime', 'qa-client']), patch.object(
-                launcher.getpass, 'getpass', side_effect=['invalid', 'QaDatabase1!', 'QaDatabase1!',
-                                                        'QaClientPass1!', 'QaClientPass1!', '']):
+    if not (qa_root / "state" / "state.json").exists():
+        with patch(
+            "builtins.input", side_effect=["qa_runtime", "qa-client"]
+        ), patch.object(
+            launcher.getpass,
+            "getpass",
+            side_effect=[
+                "invalid",
+                "QaDatabase1!",
+                "QaDatabase1!",
+                "QaClientPass1!",
+                "QaClientPass1!",
+                "",
+            ],
+        ):
             result = launcher.main(args)
     else:
-        with patch('builtins.input', return_value='qa-client'), patch.object(
-                launcher.getpass, 'getpass', side_effect=['QaClientPass1!', 'QaClientPass1!']):
-            result = launcher.main(args + ['--reset-api-client'])
+        with patch("builtins.input", return_value="qa-client"), patch.object(
+            launcher.getpass,
+            "getpass",
+            side_effect=["QaClientPass1!", "QaClientPass1!"],
+        ):
+            result = launcher.main(args + ["--reset-api-client"])
     if result:
         return result
 
@@ -66,20 +80,43 @@ def main():
     )
     token = result["access_token"]
     assert result["expires_in"] == 120
-    master_info = request('/me', token=token)
-    assert master_info['is_superuser'] and set(master_info['permissions']) == {'read', 'write', 'edit', 'delete'}
+    master_info = request("/me", token=token)
+    assert master_info["is_superuser"] and set(master_info["permissions"]) == {
+        "read",
+        "write",
+        "edit",
+        "delete",
+    }
     suffix = uuid.uuid4().hex[:8]
-    role = request('/roles', {'name': 'QA reader ' + suffix, 'permissions': ['read']}, token)
-    child = request('/api-users', {'client_id': 'qa-tenant-' + suffix,
-        'role_identifier': role['identifier'], 'sympla_token': 'qa-tenant-provider-no-live-access'}, token)
-    assert child['sympla_token_configured'] and 'sympla_token' not in child
-    child_token = request('/api/v1/token/', {'grant_type':'client_credentials',
-        'client_id':child['client_id'], 'client_secret':child['client_secret']})['access_token']
-    assert request('/api/users/' + child['identifier'], token=token)['identifier'] == child['identifier']
-    assert request('/api/v1/events/', token=child_token)['count'] == 0
+    role = request(
+        "/roles", {"name": "QA reader " + suffix, "permissions": ["read"]}, token
+    )
+    child = request(
+        "/api-users",
+        {
+            "client_id": "qa-tenant-" + suffix,
+            "role_identifier": role["identifier"],
+            "sympla_token": "qa-tenant-provider-no-live-access",
+        },
+        token,
+    )
+    assert child["sympla_token_configured"] and "sympla_token" not in child
+    child_token = request(
+        "/api/v1/token/",
+        {
+            "grant_type": "client_credentials",
+            "client_id": child["client_id"],
+            "client_secret": child["client_secret"],
+        },
+    )["access_token"]
+    assert (
+        request("/api/users/" + child["identifier"], token=token)["identifier"]
+        == child["identifier"]
+    )
+    assert request("/api/v1/events/", token=child_token)["count"] == 0
     try:
-        request('/api/v1/sync/', {}, child_token)
-        raise AssertionError('A read-only role must not trigger synchronization')
+        request("/api/v1/sync/", {}, child_token)
+        raise AssertionError("A read-only role must not trigger synchronization")
     except HTTPError as exc:
         assert exc.code == 403
     existing = request("/api/v1/schedules/", token=token)["results"]
@@ -93,16 +130,33 @@ def main():
         )
     )
     try:
-        request('/api/v1/sync/', {}, token)
-        raise AssertionError('Missing Sympla credentials should be rejected before queuing')
+        request("/api/v1/sync/", {}, token)
+        raise AssertionError(
+            "Missing Sympla credentials should be rejected before queuing"
+        )
     except HTTPError as exc:
         assert exc.code == 503
-        assert json.load(exc)['error'] == 'upstream_configuration'
-    # Scheduled/operator-created jobs still exercise the worker's safe configuration failure.
+        assert json.load(exc)["error"] == "upstream_configuration"
+        # Scheduled/operator-created jobs still exercise the worker's safe configuration failure.
     code = "from django.db import transaction; from core.services import enqueue; from core.models import ApiUser\nwith transaction.atomic():\n run=enqueue('qa-operator', owner=ApiUser.objects.get(is_superuser=True))\n print(run.pk)"
-    identifier = subprocess.check_output(['docker', 'exec', 'sympla-startup-qa-api-1',
-        'python', 'manage.py', 'shell', '-c', code], text=True).strip().splitlines()[-1]
-    run = {'id': identifier}
+    identifier = (
+        subprocess.check_output(
+            [
+                "docker",
+                "exec",
+                "sympla-startup-qa-api-1",
+                "python",
+                "manage.py",
+                "shell",
+                "-c",
+                code,
+            ],
+            text=True,
+        )
+        .strip()
+        .splitlines()[-1]
+    )
+    run = {"id": identifier}
     for _ in range(20):
         runs = request("/api/v1/sync-runs/", token=token)["results"]
         item = next(item for item in runs if item["id"] == run["id"])
@@ -115,7 +169,7 @@ def main():
         time.sleep(1)
     else:
         raise AssertionError("Worker did not process the queued manual job")
-    # Restart must not prompt, reissue client credentials, or discard database contents.
+        # Restart must not prompt, reissue client credentials, or discard database contents.
     with patch(
         "builtins.input", side_effect=AssertionError("Unexpected setup prompt")
     ), patch.object(

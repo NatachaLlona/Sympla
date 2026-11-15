@@ -4,7 +4,15 @@ import uuid
 import logging
 from django.db import transaction, IntegrityError
 from django.utils import timezone
-from .models import Schedule, SyncRun, Event, EventVersion, AuditLog, Coordinator, ApiUser
+from .models import (
+    Schedule,
+    SyncRun,
+    Event,
+    EventVersion,
+    AuditLog,
+    Coordinator,
+    ApiUser,
+)
 from .scheduling import next_occurrence
 from .sympla import fetch_events, SyncError
 from .sync_errors import message
@@ -14,23 +22,52 @@ from .provider_secrets import decrypt_token, ProviderSecretError
 logger = logging.getLogger(__name__)
 
 
-def audit(actor, action, resource, target, differences=None, interaction=None, outcome='committed', owner=None):
-    return AuditLog.objects.create(actor=actor, action=action, resource=resource,
+def audit(
+    actor,
+    action,
+    resource,
+    target,
+    differences=None,
+    interaction=None,
+    outcome="committed",
+    owner=None,
+):
+    return AuditLog.objects.create(
+        actor=actor,
+        action=action,
+        resource=resource,
         owner_identifier=owner.identifier if owner else None,
-        target_id=str(target), differences=differences or {},
-        interaction_id=interaction or uuid.uuid4(), outcome=outcome)
+        target_id=str(target),
+        differences=differences or {},
+        interaction_id=interaction or uuid.uuid4(),
+        outcome=outcome,
+    )
 
 
-def enqueue(actor, source='manual', schedule=None, scheduled_for=None, interaction=None, owner=None):
+def enqueue(
+    actor,
+    source="manual",
+    schedule=None,
+    scheduled_for=None,
+    interaction=None,
+    owner=None,
+):
     owner = owner or (schedule.owner if schedule else None)
     if owner is None:
-        raise ValueError('An explicit owner is required for synchronization.')
+        raise ValueError("An explicit owner is required for synchronization.")
     if schedule is not None and schedule.owner_id != owner.pk:
-        raise ValueError('A scheduled synchronization must use its schedule owner.')
-    run = SyncRun.objects.create(id=uuid.uuid4(), source=source, actor=actor,
-                                owner=owner,
-                                schedule=schedule, scheduled_for=scheduled_for)
-    audit(actor, 'sync.queued', 'sync_run', run.pk, interaction=interaction, owner=owner)
+        raise ValueError("A scheduled synchronization must use its schedule owner.")
+    run = SyncRun.objects.create(
+        id=uuid.uuid4(),
+        source=source,
+        actor=actor,
+        owner=owner,
+        schedule=schedule,
+        scheduled_for=scheduled_for,
+    )
+    audit(
+        actor, "sync.queued", "sync_run", run.pk, interaction=interaction, owner=owner
+    )
     return run
 
 
@@ -39,15 +76,27 @@ def enqueue_due(now=None):
     Coordinator.objects.select_for_update().get(pk=1)
     now = now or timezone.now()
     count = 0
-    for schedule in Schedule.objects.select_for_update().filter(
-            active=True, deleted_at__isnull=True, owner__is_active=True, owner__deleted_at__isnull=True,
-            next_run_at__lte=now).order_by('id'):
-        if not permitted(schedule.owner, 'write'):
+    for schedule in (
+        Schedule.objects.select_for_update()
+        .filter(
+            active=True,
+            deleted_at__isnull=True,
+            owner__is_active=True,
+            owner__deleted_at__isnull=True,
+            next_run_at__lte=now,
+        )
+        .order_by("id")
+    ):
+        if not permitted(schedule.owner, "write"):
             continue
-        enqueue('scheduler', source='scheduled', schedule=schedule,
-                scheduled_for=schedule.next_run_at)
+        enqueue(
+            "scheduler",
+            source="scheduled",
+            schedule=schedule,
+            scheduled_for=schedule.next_run_at,
+        )
         schedule.next_run_at = next_occurrence(schedule.time, schedule.timezone, now)
-        schedule.save(update_fields=['next_run_at'])
+        schedule.save(update_fields=["next_run_at"])
         count += 1
     return count
 
@@ -56,21 +105,51 @@ def claim_run():
     try:
         with transaction.atomic():
             Coordinator.objects.select_for_update().get(pk=1)
-            if SyncRun.objects.filter(status='running').exists():
+            if SyncRun.objects.filter(status="running").exists():
                 return None
-            run = SyncRun.objects.select_for_update().filter(status='queued').order_by('created_at', 'id').first()
+            run = (
+                SyncRun.objects.select_for_update()
+                .filter(status="queued")
+                .order_by("created_at", "id")
+                .first()
+            )
             if not run:
                 return None
             owner = ApiUser.objects.select_for_update().get(pk=run.owner_id)
-            if not permitted(owner, 'write'):
-                run.status, run.finished_at, run.error_code = 'cancelled', timezone.now(), 'owner_not_authorized'
+            if not permitted(owner, "write"):
+                run.status, run.finished_at, run.error_code = (
+                    "cancelled",
+                    timezone.now(),
+                    "owner_not_authorized",
+                )
                 run.save()
-                audit(owner.username, 'sync.cancelled', 'sync_run', run.pk, interaction=run.pk, owner=owner)
+                audit(
+                    owner.client_id,
+                    "sync.cancelled",
+                    "sync_run",
+                    run.pk,
+                    interaction=run.pk,
+                    owner=owner,
+                )
                 return None
             run.provider_version = owner.provider_version
-            run.status, run.running_slot, run.started_at = 'running', 1, timezone.now()
-            run.save(update_fields=['status', 'running_slot', 'started_at', 'provider_version'])
-            audit(run.actor, 'sync.started', 'sync_run', run.pk, interaction=run.pk, owner=owner)
+            run.status, run.running_slot, run.started_at = "running", 1, timezone.now()
+            run.save(
+                update_fields=[
+                    "status",
+                    "running_slot",
+                    "started_at",
+                    "provider_version",
+                ]
+            )
+            audit(
+                run.actor,
+                "sync.started",
+                "sync_run",
+                run.pk,
+                interaction=run.pk,
+                owner=owner,
+            )
             return run
     except IntegrityError:
         # Another worker owns the global running slot.
@@ -80,74 +159,138 @@ def claim_run():
 def differences(before, after):
     """Field paths plus existence flags distinguish removal from JSON null."""
     changes = {}
+
     def visit(old, new, path):
         if isinstance(old, dict) and isinstance(new, dict):
             for key in sorted(old.keys() | new.keys()):
-                child = path + '/' + key.replace('~', '~0').replace('/', '~1')
+                child = path + "/" + key.replace("~", "~0").replace("/", "~1")
                 if key not in old or key not in new:
-                    changes[child] = {'before': old.get(key), 'after': new.get(key),
-                                      'before_exists': key in old, 'after_exists': key in new}
+                    changes[child] = {
+                        "before": old.get(key),
+                        "after": new.get(key),
+                        "before_exists": key in old,
+                        "after_exists": key in new,
+                    }
                 else:
                     visit(old[key], new[key], child)
         elif old != new or type(old) is not type(new):
-            changes[path] = {'before': old, 'after': new, 'before_exists': True, 'after_exists': True}
-    visit(before, after, '')
+            changes[path] = {
+                "before": old,
+                "after": new,
+                "before_exists": True,
+                "after_exists": True,
+            }
+
+    visit(before, after, "")
     return changes
 
 
-EVENT_FIELDS = {'id', 'reference_id', 'name', 'detail', 'start_date', 'end_date', 'published',
-                'cancelled', 'private_event', 'url', 'image'}
-NESTED_FIELDS = {'address': {'name', 'address', 'address_alt', 'address_num', 'neighborhood',
-                'city', 'state', 'zip_code', 'country', 'lat', 'lon'},
-                'host': {'name', 'description'}, 'category_prim': {'name'}, 'category_sec': {'name'}}
+EVENT_FIELDS = {
+    "id",
+    "reference_id",
+    "name",
+    "detail",
+    "start_date",
+    "end_date",
+    "published",
+    "cancelled",
+    "private_event",
+    "url",
+    "image",
+}
+NESTED_FIELDS = {
+    "address": {
+        "name",
+        "address",
+        "address_alt",
+        "address_num",
+        "neighborhood",
+        "city",
+        "state",
+        "zip_code",
+        "country",
+        "lat",
+        "lon",
+    },
+    "host": {"name", "description"},
+    "category_prim": {"name"},
+    "category_sec": {"name"},
+}
 
 
 def normalize(payload):
     # Persist only documented event fields; arbitrary upstream credential fields are excluded.
     result = {key: value for key, value in payload.items() if key in EVENT_FIELDS}
     if any(isinstance(value, (dict, list)) for value in result.values()):
-        raise SyncError('upstream_invalid_event')
+        raise SyncError("upstream_invalid_event")
     for key, allowed in NESTED_FIELDS.items():
         if key in payload:
             nested = payload[key]
             if nested is not None and not isinstance(nested, dict):
-                raise SyncError('upstream_invalid_event')
-            result[key] = None if nested is None else {k: v for k, v in nested.items() if k in allowed}
-            if nested and any(isinstance(v, (dict, list)) for k, v in nested.items() if k in allowed):
-                raise SyncError('upstream_invalid_event')
-    result['id'] = str(result['id'])
+                raise SyncError("upstream_invalid_event")
+            result[key] = (
+                None
+                if nested is None
+                else {k: v for k, v in nested.items() if k in allowed}
+            )
+            if nested and any(
+                isinstance(v, (dict, list)) for k, v in nested.items() if k in allowed
+            ):
+                raise SyncError("upstream_invalid_event")
+    result["id"] = str(result["id"])
     return result
 
 
 @transaction.atomic
 def persist_events(run_id, payloads):
     Coordinator.objects.select_for_update().get(pk=1)
-    run = SyncRun.objects.select_for_update().get(pk=run_id, status='running')
+    run = SyncRun.objects.select_for_update().get(pk=run_id, status="running")
     owner = ApiUser.objects.select_for_update().get(pk=run.owner_id)
-    if not permitted(owner, 'write') or owner.provider_version != run.provider_version:
-        raise SyncError('owner_authorization_changed')
-    counts = {'received': len(payloads), 'created': 0, 'updated': 0, 'unchanged': 0}
+    if not permitted(owner, "write") or owner.provider_version != run.provider_version:
+        raise SyncError("owner_authorization_changed")
+    counts = {"received": len(payloads), "created": 0, "updated": 0, "unchanged": 0}
     for payload in payloads:
         data = normalize(payload)
-        digest = hashlib.sha256(json.dumps(data, sort_keys=True, separators=(',', ':'),
-                                         allow_nan=False).encode()).hexdigest()
-        event, created = Event.objects.get_or_create(owner=owner, external_id=data['id'])
+        digest = hashlib.sha256(
+            json.dumps(
+                data, sort_keys=True, separators=(",", ":"), allow_nan=False
+            ).encode()
+        ).hexdigest()
+        event, created = Event.objects.get_or_create(
+            owner=owner, external_id=data["id"]
+        )
         if event.fingerprint == digest:
-            counts['unchanged'] += 1
+            counts["unchanged"] += 1
             continue
         changes = differences(event.data, data)
         event.version += 1
         event.data, event.fingerprint, event.updated_at = data, digest, timezone.now()
         event.save()
-        EventVersion.objects.create(event=event, version=event.version, data=data,
-                                    differences=changes, run=run)
-        audit(run.actor, 'event.created' if created else 'event.updated', 'event', event.external_id,
-              changes, interaction=run.pk, owner=owner)
-        counts['created' if created else 'updated'] += 1
-    run.status, run.running_slot = 'success', None
+        EventVersion.objects.create(
+            event=event, version=event.version, data=data, differences=changes, run=run
+        )
+        audit(
+            run.actor,
+            "event.created" if created else "event.updated",
+            "event",
+            event.external_id,
+            changes,
+            interaction=run.pk,
+            owner=owner,
+        )
+        counts["created" if created else "updated"] += 1
+    run.status, run.running_slot = "success", None
     run.finished_at, run.counts = timezone.now(), counts
     run.save()
-    audit(run.actor, 'sync.succeeded', 'sync_run', run.pk, counts, interaction=run.pk, owner=owner)
+    audit(
+        run.actor,
+        "sync.succeeded",
+        "sync_run",
+        run.pk,
+        counts,
+        interaction=run.pk,
+        owner=owner,
+    )
     return counts
 
 
@@ -160,15 +303,38 @@ def process_one():
         payloads = fetch_events(token=decrypt_token(owner))
         persist_events(run.pk, payloads)
     except Exception as exc:
-        code = str(exc) if isinstance(exc, SyncError) else ('provider_secret_unavailable' if isinstance(exc, ProviderSecretError) else 'sync_internal_error')
+        code = (
+            str(exc)
+            if isinstance(exc, SyncError)
+            else (
+                "provider_secret_unavailable"
+                if isinstance(exc, ProviderSecretError)
+                else "sync_internal_error"
+            )
+        )
         with transaction.atomic():
             current = SyncRun.objects.select_for_update().get(pk=run.pk)
-            current.status, current.running_slot = 'failed', None
+            current.status, current.running_slot = "failed", None
             current.finished_at, current.error_code = timezone.now(), code
-            current.error_details = {'message': message(code), **(exc.details if isinstance(exc, SyncError) else {})}
+            current.error_details = {
+                "message": message(code),
+                **(exc.details if isinstance(exc, SyncError) else {}),
+            }
             current.save()
-            audit(current.actor, 'sync.failed', 'sync_run', run.pk,
-                  {'error_code': code, **current.error_details}, interaction=run.pk, outcome='rolled_back', owner=current.owner)
-        logger.error('Synchronization failed: run_id=%s error_code=%s details=%s',
-                     run.pk, code, current.error_details)
+            audit(
+                current.actor,
+                "sync.failed",
+                "sync_run",
+                run.pk,
+                {"error_code": code, **current.error_details},
+                interaction=run.pk,
+                outcome="rolled_back",
+                owner=current.owner,
+            )
+        logger.error(
+            "Synchronization failed: run_id=%s error_code=%s details=%s",
+            run.pk,
+            code,
+            current.error_details,
+        )
     return SyncRun.objects.get(pk=run.pk)

@@ -1,6 +1,17 @@
 def extend(schema):
-    schema['tags'] = [{'name': name} for name in ['Identity', 'Authorization', 'Authentication',
-                      'Schedules', 'Synchronization', 'Events', 'Audit', 'Status']]
+    schema["tags"] = [
+        {"name": name}
+        for name in [
+            "Identity",
+            "Authorization",
+            "Authentication",
+            "Schedules",
+            "Synchronization",
+            "Events",
+            "Audit",
+            "Status",
+        ]
+    ]
     from .openapi import obj, text, integer, ref, response, operation, paged, PAGINATION
 
     schemas, paths = schema["components"]["schemas"], schema["paths"]
@@ -135,7 +146,7 @@ def extend(schema):
     schemas["AccessRule"] = obj(
         {
             "identifier": uid,
-            "user_identifier": uid,
+            "api_user_identifier": uid,
             "permission": text(enum=["read", "write", "edit", "delete"]),
         }
     )
@@ -143,10 +154,10 @@ def extend(schema):
     schemas["AccessRuleCreate"] = {
         **obj(
             {
-                "user_identifier": uid,
+                "api_user_identifier": uid,
                 "permission": text(enum=["read", "write", "edit", "delete"]),
             },
-            ["user_identifier", "permission"],
+            ["api_user_identifier", "permission"],
         ),
         "additionalProperties": False,
     }
@@ -172,7 +183,7 @@ def extend(schema):
         "/api-users",
         "post",
         "createApiUser",
-        "Create an API user with its own Sympla token",
+        "Create an API account with its own Sympla token",
         "Identity",
         "ApiUserCreated",
         "CreateApiUser",
@@ -184,7 +195,7 @@ def extend(schema):
         "/api-users",
         "get",
         "listApiUsers",
-        "List API users",
+        "List API accounts",
         "Identity",
         "ApiUserList",
         description=admin,
@@ -194,7 +205,7 @@ def extend(schema):
         "/api-users/{identifier}",
         "get",
         "getApiUser",
-        "Read an API user by its unique identifier",
+        "Read an API account by its unique identifier",
         "Identity",
         "ApiUser",
         description="The master can read every identity. Ordinary identities can read only their own record.",
@@ -203,7 +214,7 @@ def extend(schema):
         "/api/users/{identifier}",
         "get",
         "getApiUserAlias",
-        "Read an API user by identifier (alias)",
+        "Read an API account by identifier (alias)",
         "Identity",
         "ApiUser",
         description="Alias for GET /api-users/{identifier}. Same authorization checks apply.",
@@ -361,7 +372,7 @@ def extend(schema):
         "Authorization",
         "Role",
         "PermissionReplacement",
-        description=admin + " Affected users must obtain a new access token.",
+        description=admin + " Affected API accounts must obtain a new access token.",
     )
     route(
         "/access-rules",

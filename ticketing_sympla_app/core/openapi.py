@@ -63,7 +63,9 @@ def operation(
         "401": response(
             "Missing, invalid or expired access token, or revoked client.", ref("Error")
         ),
-        "403": response("The required permission or master authority is missing.", ref("Error")),
+        "403": response(
+            "The required permission or master authority is missing.", ref("Error")
+        ),
         "405": response("Method not allowed.", ref("Error")),
         "500": response(
             "Internal error; uncommitted changes are rolled back.", ref("Error")
@@ -141,8 +143,13 @@ SCHEMAS = {
         ["id", "time", "timezone", "active", "next_run_at", "created_at", "created_by"],
     ),
     "QueuedRun": obj(
-        {"id": text(format="uuid"), "status": text(enum=["queued"]),
-         "status_url": text(), "message": text()}, ["id", "status", "status_url"]
+        {
+            "id": text(format="uuid"),
+            "status": text(enum=["queued"]),
+            "status_url": text(),
+            "message": text(),
+        },
+        ["id", "status", "status_url"],
     ),
     "SyncRun": obj(
         {
@@ -358,7 +365,7 @@ SCHEMA = {
         "securitySchemes": {
             "ClientCredentials": {
                 "type": "oauth2",
-                "description": "API username = client_id; API password = client_secret.",
+                "description": "API client ID = client_id; API password = client_secret.",
                 "flows": {
                     "clientCredentials": {"tokenUrl": "/api/v1/token/", "scopes": {}}
                 },
@@ -412,11 +419,29 @@ PATHS["/api/v1/token/"] = {
     }
 }
 
-PATHS['/api/v1/sync-runs/{run_id}/'] = {'get': operation(
-    'getSyncRun', 'Read a synchronization result and diagnostic details', 'Synchronization', ref('SyncRun'),
-    parameters=[{'name': 'run_id', 'in': 'path', 'required': True, 'schema': text(format='uuid')}])}
-PATHS['/api/v1/sync-runs/{run_id}/']['get']['responses']['404'] = response('Run not found', ref('Error'))
-PATHS['/api/v1/sync/']['post']['responses']['503'] = response('Sympla credentials or host are not configured', ref('Error'))
+PATHS["/api/v1/sync-runs/{run_id}/"] = {
+    "get": operation(
+        "getSyncRun",
+        "Read a synchronization result and diagnostic details",
+        "Synchronization",
+        ref("SyncRun"),
+        parameters=[
+            {
+                "name": "run_id",
+                "in": "path",
+                "required": True,
+                "schema": text(format="uuid"),
+            }
+        ],
+    )
+}
+PATHS["/api/v1/sync-runs/{run_id}/"]["get"]["responses"]["404"] = response(
+    "Run not found", ref("Error")
+)
+PATHS["/api/v1/sync/"]["post"]["responses"]["503"] = response(
+    "Sympla credentials or host are not configured", ref("Error")
+)
 
 from .identity_schema import extend
+
 extend(SCHEMA)

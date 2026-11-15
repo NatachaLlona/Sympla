@@ -44,19 +44,19 @@ def identifier(value):
         ) from None
 
 
-def target_user(value):
-    user = (
+def target_api_account(value):
+    api_account = (
         ApiUser.objects.select_for_update()
         .filter(identifier=value, deleted_at__isnull=True)
         .first()
     )
-    if not user:
-        raise ApiProblem("not_found", "API user not found.", 404)
-    return user
+    if not api_account:
+        raise ApiProblem("not_found", "API account not found.", 404)
+    return api_account
 
 
-def ordinary(user):
-    if user.is_superuser:
+def ordinary(api_account):
+    if api_account.is_superuser:
         raise ApiProblem(
             "protected_master",
             "The bootstrap master identity is protected. Use the terminal for credential changes.",
@@ -88,27 +88,31 @@ def permission_codes(values):
     return values
 
 
-def user_data(user):
+def api_account_data(api_account):
     return {
-        "identifier": str(user.identifier),
-        "client_id": user.username,
-        "role_identifier": str(user.role.identifier) if user.role else None,
-        "role": user.role.name if user.role else None,
-        "is_superuser": user.is_superuser,
-        "is_active": user.is_active,
-        "created_at": user.created_at,
-        "permissions": sorted(effective_permissions(user)),
+        "identifier": str(api_account.identifier),
+        "client_id": api_account.client_id,
+        "role_identifier": (
+            str(api_account.role.identifier) if api_account.role else None
+        ),
+        "role": api_account.role.name if api_account.role else None,
+        "is_superuser": api_account.is_superuser,
+        "is_active": api_account.is_active,
+        "created_at": api_account.created_at,
+        "permissions": sorted(effective_permissions(api_account)),
         "role_permissions": (
-            sorted(user.role.permissions.values_list("code", flat=True))
-            if user.role_id
+            sorted(api_account.role.permissions.values_list("code", flat=True))
+            if api_account.role_id
             else []
         ),
         "individual_permissions": sorted(
-            AccessRule.objects.filter(user=user).values_list("permission_id", flat=True)
+            AccessRule.objects.filter(api_account=api_account).values_list(
+                "permission_id", flat=True
+            )
         ),
-        "sympla_token_configured": bool(user.sympla_token_encrypted),
-        "credential_identifier": str(user.credential_identifier),
-        "credentials_active": bool(user.client_secret_hash),
+        "sympla_token_configured": bool(api_account.sympla_token_encrypted),
+        "credential_identifier": str(api_account.credential_identifier),
+        "credentials_active": bool(api_account.client_secret_hash),
     }
 
 
@@ -147,7 +151,7 @@ def collection(request, rows, serializer):
 
 def record(request, action, resource, target, changes=None, owner=None):
     audit(
-        request.api_user.username,
+        request.api_user.client_id,
         action,
         resource,
         target,
@@ -157,11 +161,13 @@ def record(request, action, resource, target, changes=None, owner=None):
     )
 
 
-def cancel_queued(request, user):
-    for run in SyncRun.objects.select_for_update().filter(owner=user, status="queued"):
+def cancel_queued(request, api_account):
+    for run in SyncRun.objects.select_for_update().filter(
+        owner=api_account, status="queued"
+    ):
         run.status, run.finished_at = "cancelled", timezone.now()
         run.save(update_fields=["status", "finished_at"])
-        record(request, "sync.cancelled", "sync_run", run.pk, owner=user)
+        record(request, "sync.cancelled", "sync_run", run.pk, owner=api_account)
 
 
 def new_secret():
@@ -184,16 +190,16 @@ def new_secret():
 
 @api_endpoint(["GET"], identity=True)
 def me(request):
-    return JsonResponse(user_data(request.api_user))
+    return JsonResponse(api_account_data(request.api_user))
 
 
 @api_endpoint(["GET", "POST"], master=True, identity=True)
-def users(request):
+def api_accounts(request):
     if request.method == "GET":
         return collection(
             request,
             ApiUser.objects.filter(deleted_at__isnull=True).order_by("id"),
-            user_data,
+            api_account_data,
         )
     data = payload(
         request,
@@ -203,12 +209,12 @@ def users(request):
     role = role_for(data["role_identifier"])
     secret = data["client_secret"] if "client_secret" in data else new_secret()
     try:
-        user = configure_client(
+        api_account = configure_client(
             data["client_id"],
             secret,
             role=role,
             sympla_token=data["sympla_token"],
-            actor=request.api_user.username,
+            actor=request.api_user.client_id,
             interaction=request.interaction_id,
         )
     except (ValueError, TypeError):
@@ -220,13 +226,13 @@ def users(request):
         request,
         "identity.created",
         "api_user",
-        user.identifier,
-        {"client_id": user.username, "role_identifier": str(role.identifier)},
-        owner=user,
+        api_account.identifier,
+        {"client_id": api_account.client_id, "role_identifier": str(role.identifier)},
+        owner=api_account,
     )
     return JsonResponse(
         {
-            **user_data(user),
+            **api_account_data(api_account),
             "client_secret": secret,
             "message": "Store this client secret securely; it is returned only once.",
         },
@@ -235,77 +241,80 @@ def users(request):
 
 
 @api_endpoint(["GET", "PATCH", "DELETE"], identity=True)
-def user_detail(request, user_identifier):
-    user = target_user(user_identifier)
-    if not request.api_user.is_superuser and user.pk != request.api_user.pk:
-        raise ApiProblem("not_found", "API user not found.", 404)
+def api_account_detail(request, api_user_identifier):
+    api_account = target_api_account(api_user_identifier)
+    if not request.api_user.is_superuser and api_account.pk != request.api_user.pk:
+        raise ApiProblem("not_found", "API account not found.", 404)
     if request.method == "GET":
-        return JsonResponse(user_data(user))
+        return JsonResponse(api_account_data(api_account))
     if not request.api_user.is_superuser:
         raise ApiProblem(
             "forbidden", "Master authority is required to change identity status.", 403
         )
-    ordinary(user)
+    ordinary(api_account)
     if request.method == "PATCH":
         data = payload(request, ["is_active"], ["is_active"])
         if type(data["is_active"]) is not bool:
             raise ApiProblem("invalid_status", "is_active must be a boolean.")
-        user.is_active = data["is_active"]
+        api_account.is_active = data["is_active"]
     else:
-        user.deleted_at, user.is_active = timezone.now(), False
-    user.credential_version += 1
-    user.save(update_fields=["is_active", "deleted_at", "credential_version"])
-    if not user.is_active:
-        cancel_queued(request, user)
+        api_account.deleted_at, api_account.is_active = timezone.now(), False
+    api_account.credential_version += 1
+    api_account.save(update_fields=["is_active", "deleted_at", "credential_version"])
+    if not api_account.is_active:
+        cancel_queued(request, api_account)
     record(
         request,
         "identity.status_changed",
         "api_user",
-        user.identifier,
-        {"is_active": user.is_active, "deleted": bool(user.deleted_at)},
-        owner=user,
+        api_account.identifier,
+        {"is_active": api_account.is_active, "deleted": bool(api_account.deleted_at)},
+        owner=api_account,
     )
     return (
         HttpResponse(status=204)
         if request.method == "DELETE"
-        else JsonResponse(user_data(user))
+        else JsonResponse(api_account_data(api_account))
     )
 
 
 @api_endpoint(["PUT"], master=True, identity=True)
-def assign_role(request, user_identifier):
-    user = target_user(user_identifier)
-    ordinary(user)
+def assign_role(request, api_user_identifier):
+    api_account = target_api_account(api_user_identifier)
+    ordinary(api_account)
     data = payload(request, ["role_identifier"], ["role_identifier"])
     role = role_for(data["role_identifier"])
-    previous = str(user.role.identifier) if user.role else None
-    user.role, user.credential_version = role, user.credential_version + 1
-    user.save(update_fields=["role", "credential_version"])
-    if "write" not in effective_permissions(user):
-        cancel_queued(request, user)
+    previous = str(api_account.role.identifier) if api_account.role else None
+    api_account.role, api_account.credential_version = (
+        role,
+        api_account.credential_version + 1,
+    )
+    api_account.save(update_fields=["role", "credential_version"])
+    if "write" not in effective_permissions(api_account):
+        cancel_queued(request, api_account)
     record(
         request,
         "identity.role_changed",
         "api_user",
-        user.identifier,
+        api_account.identifier,
         {"role_identifier": {"before": previous, "after": str(role.identifier)}},
-        owner=user,
+        owner=api_account,
     )
-    return JsonResponse(user_data(user))
+    return JsonResponse(api_account_data(api_account))
 
 
 @api_endpoint(["POST"], master=True, identity=True)
-def issue_credentials(request, user_identifier):
-    user = target_user(user_identifier)
-    ordinary(user)
+def issue_credentials(request, api_user_identifier):
+    api_account = target_api_account(api_user_identifier)
+    ordinary(api_account)
     payload(request, [])
     secret = new_secret()
-    user.client_secret_hash, user.credential_identifier = (
+    api_account.client_secret_hash, api_account.credential_identifier = (
         make_password(secret),
         uuid.uuid4(),
     )
-    user.credential_version += 1
-    user.save(
+    api_account.credential_version += 1
+    api_account.save(
         update_fields=[
             "client_secret_hash",
             "credential_identifier",
@@ -313,12 +322,16 @@ def issue_credentials(request, user_identifier):
         ]
     )
     record(
-        request, "identity.credentials_issued", "api_user", user.identifier, owner=user
+        request,
+        "identity.credentials_issued",
+        "api_user",
+        api_account.identifier,
+        owner=api_account,
     )
     return JsonResponse(
         {
-            "identifier": str(user.credential_identifier),
-            "client_id": user.username,
+            "identifier": str(api_account.credential_identifier),
+            "client_id": api_account.client_id,
             "client_secret": secret,
             "message": "Returned once. Previous tokens are invalid.",
         },
@@ -328,45 +341,52 @@ def issue_credentials(request, user_identifier):
 
 @api_endpoint(["DELETE"], master=True, identity=True)
 def revoke_credentials(request, credential_identifier):
-    user = (
+    api_account = (
         ApiUser.objects.select_for_update()
         .filter(credential_identifier=credential_identifier, deleted_at__isnull=True)
         .first()
     )
-    if not user:
+    if not api_account:
         raise ApiProblem("not_found", "Credentials not found.", 404)
-    ordinary(user)
-    user.client_secret_hash, user.credential_version = "", user.credential_version + 1
-    user.save(update_fields=["client_secret_hash", "credential_version"])
+    ordinary(api_account)
+    api_account.client_secret_hash, api_account.credential_version = (
+        "",
+        api_account.credential_version + 1,
+    )
+    api_account.save(update_fields=["client_secret_hash", "credential_version"])
     record(
-        request, "identity.credentials_revoked", "api_user", user.identifier, owner=user
+        request,
+        "identity.credentials_revoked",
+        "api_user",
+        api_account.identifier,
+        owner=api_account,
     )
     return HttpResponse(status=204)
 
 
 @api_endpoint(["PUT"])
-def provider_token(request, user_identifier):
-    user = target_user(user_identifier)
-    if user.pk != request.api_user.pk and not request.api_user.is_superuser:
-        raise ApiProblem("not_found", "API user not found.", 404)
+def provider_token(request, api_user_identifier):
+    api_account = target_api_account(api_user_identifier)
+    if api_account.pk != request.api_user.pk and not request.api_user.is_superuser:
+        raise ApiProblem("not_found", "API account not found.", 404)
     data = payload(request, ["sympla_token"], ["sympla_token"])
     try:
-        user.sympla_token_encrypted = encrypt_token(data["sympla_token"])
+        api_account.sympla_token_encrypted = encrypt_token(data["sympla_token"])
     except ValueError:
         raise ApiProblem(
             "invalid_provider_token", "Provide a nonempty printable Sympla token."
         ) from None
-    user.provider_version += 1
-    user.save(update_fields=["sympla_token_encrypted", "provider_version"])
+    api_account.provider_version += 1
+    api_account.save(update_fields=["sympla_token_encrypted", "provider_version"])
     record(
         request,
         "identity.provider_token_updated",
         "api_user",
-        user.identifier,
-        owner=user,
+        api_account.identifier,
+        owner=api_account,
     )
     return JsonResponse(
-        {"identifier": str(user.identifier), "sympla_token_configured": True}
+        {"identifier": str(api_account.identifier), "sympla_token_configured": True}
     )
 
 
@@ -425,7 +445,7 @@ def role_detail(request, role_identifier):
     if request.method == "DELETE":
         if ApiUser.objects.filter(role=role).exists():
             raise ApiProblem(
-                "role_in_use", "Reassign users before deleting this role.", 409
+                "role_in_use", "Reassign API accounts before deleting this role.", 409
             )
         record(request, "role.deleted", "role", role.identifier, {"name": role.name})
         role.delete()
@@ -454,12 +474,14 @@ def role_permissions(request, role_identifier):
     )
     before = sorted(role.permissions.values_list("code", flat=True))
     role.permissions.set(codes)
-    users = list(ApiUser.objects.select_for_update().filter(role=role).order_by("id"))
-    for user in users:
-        user.credential_version += 1
-        user.save(update_fields=["credential_version"])
-        if "write" not in effective_permissions(user):
-            cancel_queued(request, user)
+    api_accounts = list(
+        ApiUser.objects.select_for_update().filter(role=role).order_by("id")
+    )
+    for api_account in api_accounts:
+        api_account.credential_version += 1
+        api_account.save(update_fields=["credential_version"])
+        if "write" not in effective_permissions(api_account):
+            cancel_queued(request, api_account)
     record(
         request,
         "role.permissions_changed",
@@ -485,7 +507,7 @@ def permissions(request):
 def rule_data(rule):
     return {
         "identifier": str(rule.identifier),
-        "user_identifier": str(rule.user.identifier),
+        "api_user_identifier": str(rule.api_account.identifier),
         "permission": rule.permission_id,
     }
 
@@ -495,21 +517,28 @@ def access_rules(request):
     if request.method == "GET":
         return collection(request, AccessRule.objects.order_by("id"), rule_data)
     data = payload(
-        request, ["user_identifier", "permission"], ["user_identifier", "permission"]
+        request,
+        ["api_user_identifier", "permission"],
+        ["api_user_identifier", "permission"],
     )
-    user = target_user(identifier(data["user_identifier"]))
-    ordinary(user)
+    api_account = target_api_account(identifier(data["api_user_identifier"]))
+    ordinary(api_account)
     permission_codes([data["permission"]])
-    rule = AccessRule.objects.create(user=user, permission_id=data["permission"])
-    user.credential_version += 1
-    user.save(update_fields=["credential_version"])
+    rule = AccessRule.objects.create(
+        api_account=api_account, permission_id=data["permission"]
+    )
+    api_account.credential_version += 1
+    api_account.save(update_fields=["credential_version"])
     record(
         request,
         "access_rule.created",
         "access_rule",
         rule.identifier,
-        {"permission": rule.permission_id, "user_identifier": str(user.identifier)},
-        owner=user,
+        {
+            "permission": rule.permission_id,
+            "api_user_identifier": str(api_account.identifier),
+        },
+        owner=api_account,
     )
     return JsonResponse(rule_data(rule), status=201)
 
@@ -519,48 +548,50 @@ def remove_rule(request, rule_identifier):
     rule = AccessRule.objects.filter(identifier=rule_identifier).first()
     if not rule:
         raise ApiProblem("not_found", "Access rule not found.", 404)
-    user = target_user(rule.user.identifier)
-    ordinary(user)
+    api_account = target_api_account(rule.api_account.identifier)
+    ordinary(api_account)
     record(
         request,
         "access_rule.deleted",
         "access_rule",
         rule.identifier,
         {"permission": rule.permission_id},
-        owner=user,
+        owner=api_account,
     )
     rule.delete()
-    user.credential_version += 1
-    user.save(update_fields=["credential_version"])
-    if "write" not in effective_permissions(user):
-        cancel_queued(request, user)
+    api_account.credential_version += 1
+    api_account.save(update_fields=["credential_version"])
+    if "write" not in effective_permissions(api_account):
+        cancel_queued(request, api_account)
     return HttpResponse(status=204)
 
 
 @api_endpoint(["PUT"], master=True, identity=True)
-def individual_permissions(request, user_identifier):
-    user = target_user(user_identifier)
-    ordinary(user)
+def individual_permissions(request, api_user_identifier):
+    api_account = target_api_account(api_user_identifier)
+    ordinary(api_account)
     codes = permission_codes(
         payload(request, ["permissions"], ["permissions"])["permissions"]
     )
     previous = sorted(
-        AccessRule.objects.filter(user=user).values_list("permission_id", flat=True)
+        AccessRule.objects.filter(api_account=api_account).values_list(
+            "permission_id", flat=True
+        )
     )
-    AccessRule.objects.filter(user=user).delete()
+    AccessRule.objects.filter(api_account=api_account).delete()
     AccessRule.objects.bulk_create(
-        [AccessRule(user=user, permission_id=code) for code in codes]
+        [AccessRule(api_account=api_account, permission_id=code) for code in codes]
     )
-    user.credential_version += 1
-    user.save(update_fields=["credential_version"])
-    if "write" not in effective_permissions(user):
-        cancel_queued(request, user)
+    api_account.credential_version += 1
+    api_account.save(update_fields=["credential_version"])
+    if "write" not in effective_permissions(api_account):
+        cancel_queued(request, api_account)
     record(
         request,
         "identity.permissions_changed",
         "api_user",
-        user.identifier,
+        api_account.identifier,
         {"permissions": {"before": previous, "after": codes}},
-        owner=user,
+        owner=api_account,
     )
-    return JsonResponse(user_data(user))
+    return JsonResponse(api_account_data(api_account))

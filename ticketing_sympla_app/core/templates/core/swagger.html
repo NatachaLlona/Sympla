@@ -17,7 +17,11 @@
       persistAuthorization: false,
       validatorUrl: null,
       supportedSubmitMethods: ['get', 'post', 'patch', 'delete'],
-      withCredentials: false
+      withCredentials: false,
+      requestInterceptor: (request) => {
+        request.credentials = 'omit';
+        return request;
+      }
     });
     ui.initOAuth({useBasicAuthenticationWithAccessCodeGrant: false});
   </script>

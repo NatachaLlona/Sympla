@@ -15,7 +15,7 @@ python start.py
 In this workspace, C:\Dev\ticketing_sympla\start.py forwards to the maintained release checkout.
 In a Git clone, use start.py from the repository root. The launcher prints the configuration path.
 
-First launch prompts in English for the database username/password, API client ID/secret, and an optional
+First launch prompts in English for the database account name/password, API client ID/secret, and an optional
 Sympla provider token. Password input is hidden and confirmation is required. Invalid passwords explain
 the rules and prompt again: **8 to 16 characters, uppercase, lowercase, digit and special character**;
 printable ASCII only, no spaces. Database credentials and API credentials are separate.
@@ -45,7 +45,7 @@ Changing the database name/project after initialization is blocked: start.py nev
 replaces or deletes existing databases. Plan an explicit migration or a separate new instance instead.
 
 Credentials live under .local/, excluded from Git and Docker builds. The launcher restricts this directory
-to the current user (and SYSTEM on Windows). Individual files are mounted as Compose secrets; passwords
+to the current operating-system account (and SYSTEM on Windows). Individual files are mounted as Compose secrets; passwords
 are not Docker command arguments or environment values. The API client secret bootstrap file is cleared
 after its password hash is saved. Database and Django secret files must remain available for restarts.
 Protect this directory and backups of it and the PostgreSQL volume.
@@ -66,7 +66,7 @@ a distinct Docker project and ports to isolate another instance.
 
 ## Authentication and Swagger
 
-**API username = client_id. API password = client_secret.** These credentials are exchanged for an
+**API client ID = client_id. API password = client_secret.** These credentials are exchanged for an
 expiring opaque Bearer token through the client credentials flow. They are separate from both the
 Sympla provider token and the database credentials.
 
@@ -173,7 +173,7 @@ error_code and error_details with an English message and, for upstream HTTP erro
 Upstream bodies, authorization headers and pagination cursors are never included in these diagnostics.
 
 If the account provider token is missing, manual sync returns 503 before queuing.
-The master may use python start.py --configure-sympla; ordinary users use their own identity provider-token endpoint.
+The master may use python start.py --configure-sympla; ordinary API accounts use their own identity provider-token endpoint.
 Reconfigure only after active imports finish. The Sympla token is separate from your API client secret.
 
 From the workspace root:
@@ -195,7 +195,7 @@ stdout logs belong to the container and may be replaced when containers are recr
 Sympla cursor pagination permits terminal pages containing only quantity and page_size: no next_cursor
 means there is no next page. The importer supports that response even for a single-page/empty result.
 
-## Identity, roles and user-owned Sympla accounts
+## Identity, roles and API account-owned Sympla accounts
 
 The terminal identity is the single protected master. It cannot be demoted, disabled, deleted or have
 its credentials revoked through HTTP. Use start.py --reset-api-client for master credential changes.
@@ -254,10 +254,10 @@ Authorization routes:
 - POST/GET /access-rules; DELETE /access-rules/{identifier}
 
 The reader/operator/master system roles are immutable; custom roles are editable. Referenced roles
-cannot be deleted. The master can inspect all public identities and audit/access logs. Ordinary users
+cannot be deleted. The master can inspect all public identities and audit/access logs. Ordinary API accounts
 can inspect only their own identity and logs. Provider-derived data and schedules are owner-scoped,
 including the master's normal operational routes. The same external event ID/time can exist for two
-users without sharing data or conflicting.
+API accounts without sharing data or conflicting.
 
 Role assignments, grant changes, account status changes and credential changes invalidate affected
 access tokens. Reauthorize after an approved role/grant change. Losing write permission or deactivation
@@ -267,7 +267,7 @@ commits; changes during an upstream fetch prevent a stale result from being save
 Provider tokens are encrypted in PostgreSQL using Fernet authenticated encryption. The key lives
 separately in .local/provider_encryption_key, mounted as a Docker secret. Back up that key with the DB;
 a replacement key cannot decrypt existing values. Startup refuses to regenerate a missing initialized
-key. Ordinary users update only their own provider token and require edit permission; the master may
+key. Ordinary API accounts update only their own provider token and require edit permission; the master may
 update a target account's write-only provider token. Normal restarts preserve API-updated credentials.
 The raw master setup secret is available only to the bootstrap container, not API/worker containers.
 
@@ -278,3 +278,12 @@ credentials. Startup automatically supplies INITIAL_CLIENT_ID for the migration,
 before structural changes and restarts them afterward. The worker drains its current import on shutdown.
 
 The master provider setup file is cleared after its encrypted value is saved. Retain the encryption key and database backups.
+
+## Swagger authentication behavior
+
+Swagger Authorize is the single API credential entry point. A failed token exchange returns a safe
+API error and a Bearer challenge, never a Basic challenge that opens the browser-native sign-in dialog.
+Swagger omits cached browser authentication credentials; the explicit API Bearer header still authorizes
+protected calls. The existing API client ID and selected API secret are preserved through upgrades.
+Application identifiers distinguish API accounts, database accounts and operating-system accounts.
+Historical SQL column names are mapped explicitly rather than changing credential data or applied history.

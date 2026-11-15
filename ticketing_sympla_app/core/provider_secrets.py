@@ -26,10 +26,10 @@ def encrypt_token(value):
     return cipher().encrypt(value.encode()).decode()
 
 
-def decrypt_token(user):
-    if not user.sympla_token_encrypted:
+def decrypt_token(api_account):
+    if not api_account.sympla_token_encrypted:
         return ""
     try:
-        return cipher().decrypt(user.sympla_token_encrypted.encode()).decode()
+        return cipher().decrypt(api_account.sympla_token_encrypted.encode()).decode()
     except (InvalidToken, ValueError, UnicodeError):
         raise ProviderSecretError("Provider token cannot be decrypted.") from None

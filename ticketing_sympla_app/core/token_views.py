@@ -92,33 +92,46 @@ def token(request):
             except (ValueError, TypeError, UnicodeError):
                 result = JsonResponse({"error": "invalid_request"}, status=400)
             else:
-                user = (
+                api_account = (
                     ApiUser.objects.select_for_update()
-                    .filter(username=client_id)
+                    .filter(client_id=client_id)
                     .first()
                 )
                 valid = check_password(
                     secret,
                     (
-                        user.client_secret_hash
-                        if user and user.client_secret_hash
+                        api_account.client_secret_hash
+                        if api_account and api_account.client_secret_hash
                         else DUMMY_HASH
                     ),
                 )
-                if not user or not valid or not user.is_active or user.deleted_at:
-                    result = JsonResponse({"error": "invalid_client"}, status=401)
-                    result["WWW-Authenticate"] = 'Basic realm="token"'
+                if (
+                    not api_account
+                    or not valid
+                    or not api_account.is_active
+                    or api_account.deleted_at
+                ):
+                    result = JsonResponse(
+                        {
+                            "error": "invalid_client",
+                            "error_description": "Invalid API client ID or API client secret.",
+                        },
+                        status=401,
+                    )
+                    # A Basic challenge opens the browser's native sign-in dialog.
+                    # Swagger owns the client-credentials form; errors stay in that form.
+                    result["WWW-Authenticate"] = 'Bearer realm="api-token"'
                 else:
-                    actor = user.username
+                    actor = api_account.client_id
                     AccessToken.objects.filter(
-                        user=user, expires_at__lte=started
+                        api_account=api_account, expires_at__lte=started
                     ).delete()
                     value = secrets.token_urlsafe(48)
                     ttl = settings.API_TOKEN_TTL_SECONDS
                     AccessToken.objects.create(
                         token_hash=hashlib.sha256(value.encode()).hexdigest(),
-                        user=user,
-                        credential_version=user.credential_version,
+                        api_account=api_account,
+                        credential_version=api_account.credential_version,
                         expires_at=started + timedelta(seconds=ttl),
                     )
                     result = JsonResponse(
@@ -129,7 +142,7 @@ def token(request):
                         }
                     )
         ApiRequestLog.objects.create(
-            owner_identifier=user.identifier if actor else None,
+            owner_identifier=api_account.identifier if actor else None,
             interaction_id=interaction,
             started_at=started,
             finished_at=timezone.now(),

@@ -34,14 +34,14 @@ class IdentityTests(TestCase):
         self.role = Role.objects.create(name="Custom operator")
         self.role.permissions.set(["read", "write", "edit", "delete"])
 
-    def header(self, user):
-        user.refresh_from_db()
-        value = f"test-{user.identifier}-{user.credential_version}"
+    def header(self, api_account):
+        api_account.refresh_from_db()
+        value = f"test-{api_account .identifier }-{api_account .credential_version }"
         AccessToken.objects.update_or_create(
             token_hash=hashlib.sha256(value.encode()).hexdigest(),
             defaults={
-                "user": user,
-                "credential_version": user.credential_version,
+                "api_account": api_account,
+                "credential_version": api_account.credential_version,
                 "expires_at": timezone.now() + timedelta(hours=1),
             },
         )
@@ -55,7 +55,7 @@ class IdentityTests(TestCase):
             **(header or self.master_header),
         )
 
-    def create_user(self, name="alice", provider="alice-provider-test-only"):
+    def create_api_account(self, name="alice", provider="alice-provider-test-only"):
         result = self.request(
             "post",
             "/api-users",
@@ -72,18 +72,21 @@ class IdentityTests(TestCase):
         )
 
     def test_create_lookup_and_write_only_provider_secret(self):
-        user, result = self.create_user()
+        api_account, result = self.create_api_account()
         self.assertTrue(valid_password(result["client_secret"]))
-        self.assertEqual(decrypt_token(user), "alice-provider-test-only")
-        self.assertNotIn("alice-provider-test-only", user.sympla_token_encrypted)
-        for path in [f"/api-users/{user.identifier}", f"/api/users/{user.identifier}"]:
+        self.assertEqual(decrypt_token(api_account), "alice-provider-test-only")
+        self.assertNotIn("alice-provider-test-only", api_account.sympla_token_encrypted)
+        for path in [
+            f"/api-users/{api_account .identifier }",
+            f"/api/users/{api_account .identifier }",
+        ]:
             public = self.client.get(path, **self.master_header)
             self.assertEqual(public.status_code, 200)
             for secret in [
                 "alice-provider-test-only",
                 result["client_secret"],
-                user.client_secret_hash,
-                user.sympla_token_encrypted,
+                api_account.client_secret_hash,
+                api_account.sympla_token_encrypted,
             ]:
                 self.assertNotIn(secret, public.content.decode())
         logs = str(list(AuditLog.objects.values())) + str(
@@ -118,27 +121,27 @@ class IdentityTests(TestCase):
                 },
             )
             self.assertEqual(result.status_code, 400)
-        self.assertFalse(ApiUser.objects.filter(username="bad-user").exists())
+        self.assertFalse(ApiUser.objects.filter(client_id="bad-user").exists())
 
     def test_master_is_protected_and_cannot_be_assigned(self):
-        user, _ = self.create_user()
+        api_account, _ = self.create_api_account()
         for path, method, data in [
-            (f"/api-users/{self.master.identifier}", "patch", {"is_active": False}),
-            (f"/api-users/{self.master.identifier}", "delete", None),
+            (f"/api-users/{self .master .identifier }", "patch", {"is_active": False}),
+            (f"/api-users/{self .master .identifier }", "delete", None),
             (
-                f"/api-users/{self.master.identifier}/role",
+                f"/api-users/{self .master .identifier }/role",
                 "put",
                 {"role_identifier": str(self.role.identifier)},
             ),
-            (f"/api-users/{self.master.identifier}/credentials", "post", {}),
-            (f"/credentials/{self.master.credential_identifier}", "delete", None),
+            (f"/api-users/{self .master .identifier }/credentials", "post", {}),
+            (f"/credentials/{self .master .credential_identifier }", "delete", None),
             (
-                f"/roles/{self.master.role.identifier}/permissions",
+                f"/roles/{self .master .role .identifier }/permissions",
                 "put",
                 {"permissions": []},
             ),
             (
-                f"/api-users/{user.identifier}/role",
+                f"/api-users/{api_account .identifier }/role",
                 "put",
                 {"role_identifier": str(self.master.role.identifier)},
             ),
@@ -148,15 +151,15 @@ class IdentityTests(TestCase):
         self.assertTrue(self.master.is_superuser and self.master.is_active)
 
     def test_ordinary_users_cannot_administer_or_inspect_other_identities(self):
-        alice, _ = self.create_user()
-        bob, _ = self.create_user("bob", "bob-provider-test-only")
+        alice, _ = self.create_api_account()
+        bob, _ = self.create_api_account("bob", "bob-provider-test-only")
         header = self.header(alice)
         self.assertEqual(
             self.client.get("/me", **header).json()["identifier"], str(alice.identifier)
         )
         self.assertEqual(self.client.get("/api-users", **header).status_code, 403)
         self.assertEqual(
-            self.client.get(f"/api-users/{bob.identifier}", **header).status_code, 404
+            self.client.get(f"/api-users/{bob .identifier }", **header).status_code, 404
         )
         self.assertEqual(
             self.request(
@@ -167,7 +170,7 @@ class IdentityTests(TestCase):
         self.assertEqual(
             self.request(
                 "put",
-                f"/api-users/{alice.identifier}/permissions",
+                f"/api-users/{alice .identifier }/permissions",
                 {"permissions": ["read"]},
                 header,
             ).status_code,
@@ -176,8 +179,8 @@ class IdentityTests(TestCase):
 
     def test_four_permissions_are_independent_and_changes_revoke_tokens(self):
         self.role.permissions.set(["write"])
-        user, _ = self.create_user()
-        header = self.header(user)
+        api_account, _ = self.create_api_account()
+        header = self.header(api_account)
         created = self.request(
             "post", "/api/v1/schedules/", {"time": "09:30", "timezone": "UTC"}, header
         )
@@ -186,34 +189,34 @@ class IdentityTests(TestCase):
         self.assertEqual(self.client.get("/api/v1/events/", **header).status_code, 403)
         self.assertEqual(
             self.request(
-                "patch", f"/api/v1/schedules/{schedule_id}/", {"active": False}, header
+                "patch", f"/api/v1/schedules/{schedule_id }/", {"active": False}, header
             ).status_code,
             403,
         )
         self.assertEqual(
             self.request(
-                "delete", f"/api/v1/schedules/{schedule_id}/", header=header
+                "delete", f"/api/v1/schedules/{schedule_id }/", header=header
             ).status_code,
             403,
         )
         result = self.request(
             "put",
-            f"/roles/{self.role.identifier}/permissions",
+            f"/roles/{self .role .identifier }/permissions",
             {"permissions": ["read", "edit", "delete"]},
         )
         self.assertEqual(result.status_code, 200)
         self.assertEqual(self.client.get("/api/v1/events/", **header).status_code, 401)
-        header = self.header(user)
+        header = self.header(api_account)
         self.assertEqual(self.client.get("/api/v1/events/", **header).status_code, 200)
         self.assertEqual(
             self.request(
-                "patch", f"/api/v1/schedules/{schedule_id}/", {"active": False}, header
+                "patch", f"/api/v1/schedules/{schedule_id }/", {"active": False}, header
             ).status_code,
             200,
         )
         self.assertEqual(
             self.request(
-                "delete", f"/api/v1/schedules/{schedule_id}/", header=header
+                "delete", f"/api/v1/schedules/{schedule_id }/", header=header
             ).status_code,
             204,
         )
@@ -223,32 +226,34 @@ class IdentityTests(TestCase):
 
     def test_individual_grants_preserve_role_and_rule_crud(self):
         self.role.permissions.set([])
-        user, _ = self.create_user()
+        api_account, _ = self.create_api_account()
         result = self.request(
             "post",
             "/access-rules",
-            {"user_identifier": str(user.identifier), "permission": "read"},
+            {"api_user_identifier": str(api_account.identifier), "permission": "read"},
         )
         self.assertEqual(result.status_code, 201)
         rule_id = result.json()["identifier"]
         self.assertEqual(
-            self.client.get("/api/v1/events/", **self.header(user)).status_code, 200
+            self.client.get("/api/v1/events/", **self.header(api_account)).status_code,
+            200,
         )
         self.assertEqual(
-            self.request("delete", f"/access-rules/{rule_id}").status_code, 204
+            self.request("delete", f"/access-rules/{rule_id }").status_code, 204
         )
         self.assertEqual(
-            self.client.get("/api/v1/events/", **self.header(user)).status_code, 403
+            self.client.get("/api/v1/events/", **self.header(api_account)).status_code,
+            403,
         )
-        original = user.role_id
+        original = api_account.role_id
         result = self.request(
             "put",
-            f"/api-users/{user.identifier}/permissions",
+            f"/api-users/{api_account .identifier }/permissions",
             {"permissions": ["read", "write"]},
         )
         self.assertEqual(result.status_code, 200)
-        user.refresh_from_db()
-        self.assertEqual(user.role_id, original)
+        api_account.refresh_from_db()
+        self.assertEqual(api_account.role_id, original)
         self.assertEqual(set(result.json()["permissions"]), {"read", "write"})
 
     def test_role_lifecycle_and_relationship_conflicts(self):
@@ -259,26 +264,26 @@ class IdentityTests(TestCase):
         role_id = result.json()["identifier"]
         self.assertEqual(
             self.request(
-                "patch", f"/roles/{role_id}", {"description": "Updated"}
+                "patch", f"/roles/{role_id }", {"description": "Updated"}
             ).status_code,
             200,
         )
-        user, _ = self.create_user()
+        api_account, _ = self.create_api_account()
         self.assertEqual(
             self.request(
                 "put",
-                f"/api-users/{user.identifier}/role",
+                f"/api-users/{api_account .identifier }/role",
                 {"role_identifier": role_id},
             ).status_code,
             200,
         )
-        self.assertEqual(self.request("delete", f"/roles/{role_id}").status_code, 409)
+        self.assertEqual(self.request("delete", f"/roles/{role_id }").status_code, 409)
         self.request(
             "put",
-            f"/api-users/{user.identifier}/role",
+            f"/api-users/{api_account .identifier }/role",
             {"role_identifier": str(self.role.identifier)},
         )
-        self.assertEqual(self.request("delete", f"/roles/{role_id}").status_code, 204)
+        self.assertEqual(self.request("delete", f"/roles/{role_id }").status_code, 204)
         self.assertEqual(
             self.request(
                 "post", "/roles", {"name": "Invalid", "permissions": ["admin"]}
@@ -287,9 +292,11 @@ class IdentityTests(TestCase):
         )
 
     def test_credential_issue_revoke_and_identity_status(self):
-        user, original = self.create_user()
-        old_header = self.header(user)
-        result = self.request("post", f"/api-users/{user.identifier}/credentials", {})
+        api_account, original = self.create_api_account()
+        old_header = self.header(api_account)
+        result = self.request(
+            "post", f"/api-users/{api_account .identifier }/credentials", {}
+        )
         self.assertEqual(result.status_code, 201)
         self.assertNotEqual(result.json()["client_secret"], original["client_secret"])
         self.assertEqual(self.client.get("/me", **old_header).status_code, 401)
@@ -303,16 +310,16 @@ class IdentityTests(TestCase):
             "/api/v1/token/",
             {
                 "grant_type": "client_credentials",
-                "client_id": user.username,
+                "client_id": api_account.client_id,
                 "client_secret": result.json()["client_secret"],
             },
             content_type="application/json",
         )
         self.assertEqual(denied.status_code, 401)
-        run = enqueue(user.username, owner=user)
+        run = enqueue(api_account.client_id, owner=api_account)
         self.assertEqual(
             self.request(
-                "patch", f"/api-users/{user.identifier}", {"is_active": False}
+                "patch", f"/api-users/{api_account .identifier }", {"is_active": False}
             ).status_code,
             200,
         )
@@ -321,15 +328,15 @@ class IdentityTests(TestCase):
 
     @patch("core.services.fetch_events")
     def test_provider_events_schedules_runs_and_logs_are_user_scoped(self, fetch):
-        alice, _ = self.create_user()
-        bob, _ = self.create_user("bob", "bob-provider-test-only")
+        alice, _ = self.create_api_account()
+        bob, _ = self.create_api_account("bob", "bob-provider-test-only")
         fetch.side_effect = [
             [{"id": "same-external-id", "name": "Alice event"}],
             [{"id": "same-external-id", "name": "Bob event"}],
         ]
-        first = enqueue(alice.username, owner=alice)
+        first = enqueue(alice.client_id, owner=alice)
         process_one()
-        second = enqueue(bob.username, owner=bob)
+        second = enqueue(bob.client_id, owner=bob)
         process_one()
         self.assertEqual(
             fetch.call_args_list[0].kwargs["token"], "alice-provider-test-only"
@@ -344,26 +351,26 @@ class IdentityTests(TestCase):
         foreign = Event.objects.get(owner=bob)
         self.assertEqual(
             self.client.get(
-                f"/api/v1/events/{foreign.id}/versions/", **header
+                f"/api/v1/events/{foreign .id }/versions/", **header
             ).status_code,
             404,
         )
         self.assertEqual(
-            self.client.get(f"/api/v1/sync-runs/{second.pk}/", **header).status_code,
+            self.client.get(f"/api/v1/sync-runs/{second .pk }/", **header).status_code,
             404,
         )
-        for user in [alice, bob]:
+        for api_account in [alice, bob]:
             response = self.request(
                 "post",
                 "/api/v1/schedules/",
                 {"time": "09:30", "timezone": "UTC"},
-                self.header(user),
+                self.header(api_account),
             )
             self.assertEqual(response.status_code, 201)
         foreign_schedule = Schedule.objects.get(owner=bob)
         self.assertEqual(
             self.request(
-                "delete", f"/api/v1/schedules/{foreign_schedule.pk}/", header=header
+                "delete", f"/api/v1/schedules/{foreign_schedule .pk }/", header=header
             ).status_code,
             404,
         )
@@ -375,13 +382,13 @@ class IdentityTests(TestCase):
 
     @patch("core.services.fetch_events")
     def test_provider_rotation_during_import_prevents_stale_commit(self, fetch):
-        user, _ = self.create_user()
-        enqueue(user.username, owner=user)
+        api_account, _ = self.create_api_account()
+        enqueue(api_account.client_id, owner=api_account)
 
         def response(**kwargs):
             changed = self.request(
                 "put",
-                f"/api-users/{user.identifier}/sympla-token",
+                f"/api-users/{api_account .identifier }/sympla-token",
                 {"sympla_token": "replacement-test-provider"},
             )
             self.assertEqual(changed.status_code, 200)
@@ -391,14 +398,16 @@ class IdentityTests(TestCase):
         result = process_one()
         self.assertEqual(result.status, "failed")
         self.assertEqual(result.error_code, "owner_authorization_changed")
-        self.assertFalse(Event.objects.filter(owner=user).exists())
+        self.assertFalse(Event.objects.filter(owner=api_account).exists())
 
     @override_settings(SYMPLA_API_KEY="master-global-provider-must-never-be-used")
     def test_an_ordinary_account_never_falls_back_to_global_provider(self):
-        user = configure_client("legacy-no-provider", "Testing1!", role=self.role)
-        result = self.request("post", "/api/v1/sync/", {}, self.header(user))
+        api_account = configure_client(
+            "legacy-no-provider", "Testing1!", role=self.role
+        )
+        result = self.request("post", "/api/v1/sync/", {}, self.header(api_account))
         self.assertEqual(result.status_code, 503)
-        self.assertFalse(SyncRun.objects.filter(owner=user).exists())
+        self.assertFalse(SyncRun.objects.filter(owner=api_account).exists())
 
     def test_identity_audit_failure_rolls_back_account_and_secret(self):
         with patch(
@@ -414,7 +423,7 @@ class IdentityTests(TestCase):
                 },
             )
         self.assertEqual(result.status_code, 500)
-        self.assertFalse(ApiUser.objects.filter(username="must-not-exist").exists())
+        self.assertFalse(ApiUser.objects.filter(client_id="must-not-exist").exists())
         self.assertNotIn(
             "private-provider-value", str(list(ApiRequestLog.objects.values()))
         )
