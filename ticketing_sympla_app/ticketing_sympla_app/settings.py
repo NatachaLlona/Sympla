@@ -26,9 +26,23 @@ load_dotenv(BASE_DIR / '.env')
 SECRET_KEY = os.environ['DJANGO_SECRET_KEY']
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.getenv('DJANGO_DEBUG', 'false').lower() == 'true'
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = [host.strip() for host in os.getenv('DJANGO_ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',') if host.strip()]
+SECURE_SSL_REDIRECT = not DEBUG
+SESSION_COOKIE_SECURE = not DEBUG
+CSRF_COOKIE_SECURE = not DEBUG
+SECURE_HSTS_SECONDS = 31536000 if not DEBUG else 0
+SECURE_HSTS_INCLUDE_SUBDOMAINS = False
+SECURE_HSTS_PRELOAD = False
+if os.getenv('DJANGO_TRUST_PROXY', 'false').lower() == 'true':
+    # Only enable behind a trusted proxy that strips untrusted forwarding headers.
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+DATA_UPLOAD_MAX_MEMORY_SIZE = 4096
+PASSWORD_HASHERS = [
+    'django.contrib.auth.hashers.PBKDF2PasswordHasher',
+    'django.contrib.auth.hashers.PBKDF2SHA1PasswordHasher',
+]
 
 
 # Application definition
@@ -82,6 +96,21 @@ DATABASES = {
         'NAME': BASE_DIR / 'db.sqlite3',
     }
 }
+if os.getenv('DB_ENGINE', 'sqlite') == 'postgresql':
+    DATABASES['default'] = {
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': os.environ['DB_NAME'], 'USER': os.environ['DB_USER'],
+        'PASSWORD': os.environ['DB_PASSWORD'], 'HOST': os.environ['DB_HOST'],
+        'PORT': os.getenv('DB_PORT', '5432'),
+        'OPTIONS': {'sslmode': os.getenv('DB_SSLMODE', 'verify-full')},
+    }
+SYMPLA_API_HOST = os.getenv('SYMPLA_API_HOST', 'https://api.sympla.com.br/public/v1.6.0')
+SYMPLA_API_KEY = os.getenv('SYMPLA_API_KEY', '')
+SYNC_MAX_PAGES = 100
+SYNC_MAX_EVENTS = 20000
+SYNC_MAX_PAGE_BYTES = 2 * 1024 * 1024
+SYNC_MAX_TOTAL_BYTES = 32 * 1024 * 1024
+SYNC_TIMEOUT_SECONDS = 300
 
 
 # Password validation
@@ -124,9 +153,3 @@ STATIC_URL = 'static/'
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
-
-import os
-from dotenv import load_dotenv
-
-# Carrega o arquivo .env
-load_dotenv()

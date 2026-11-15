@@ -1,4 +1,6 @@
-﻿# Análise técnica e de segurança — 15/11/2026
+﻿> Registro histórico do protótipo importado. A implementação atual está descrita em README.md e VALIDATION.md.
+
+# Análise técnica e de segurança — 15/11/2026
 
 ## Finalidade e escopo
 

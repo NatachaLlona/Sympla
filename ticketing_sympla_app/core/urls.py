@@ -1,8 +1,14 @@
-from django.urls import path
-from .views import ping, update
+﻿from django.urls import path
+from . import views
 
-#Determina qual endpoint, usa qual classe de views
 urlpatterns = [
-    path("ping/", ping),
-    path("update/", update),
+    path('ping/', views.ping),
+    path('api/v1/schedules/', views.schedules),
+    path('api/v1/schedules/<int:schedule_id>/', views.schedule_detail),
+    path('api/v1/sync/', views.sync_now),
+    path('api/v1/sync-runs/', views.runs),
+    path('api/v1/events/', views.events),
+    path('api/v1/events/<int:event_id>/versions/', views.versions),
+    path('api/v1/audit-logs/', views.audit_logs),
+    path('api/v1/request-logs/', views.request_logs),
 ]
