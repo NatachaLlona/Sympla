@@ -6,6 +6,9 @@ daily or on-demand API synchronization. File uploads, sales entities and report 
 
 ## Relational events, integration CRUD and lineage
 
+Project diagrams: [Entity-relationship diagram (ERD)](docs/data-model.md) and
+[program logic flowcharts](docs/import-flow.md). Both documents use Mermaid and render on GitHub.
+
 Events now have typed relational columns for their core attributes and related address, host and
 primary/secondary category records. The sanitized source snapshot remains available as `data` for
 compatibility and immutable change history. Date strings and coordinates retain source formatting;
