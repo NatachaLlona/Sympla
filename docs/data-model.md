@@ -65,7 +65,7 @@ erDiagram
         string connector_version
         datetime collected_at
         datetime scheduled_for
-        integer running_slot UK "Nullable except while running"
+        integer running_slot UK "Nullable except while running; provider slot"
         json counts
         string error_code
     }
@@ -148,7 +148,7 @@ their API account owner; the application validates matching ownership before col
 | --- | --- |
 | Integration | Live name per owner; at most one live default per owner |
 | Schedule | Live `(owner_id, integration_id, time, timezone)` |
-| SyncRun | `(schedule_id, scheduled_for)`; one global running slot |
+| SyncRun | `(schedule_id, scheduled_for)`; one running slot per provider |
 | EventCategory | `(event_id, kind)` |
 | EventVersion | `(event_id, version)` |
 | EventObservation | `(event_id, run_id)` |
@@ -271,3 +271,104 @@ logical references; they must not be drawn as database-enforced relationships. A
 logs are append-only. Framework-managed Django tables are outside the scope of these application diagrams.
 
 See [the program flowcharts](import-flow.md) for the runtime decisions that populate these records.
+
+## IBGE relational statistics
+
+```mermaid
+erDiagram
+    GEOGRAPHY o|--o{ GEOGRAPHY : parent_of
+    INTEGRATION ||--o{ STATISTIC : owns
+    GEOGRAPHY ||--o{ STATISTIC : locates
+    STATISTICAL_INDICATOR ||--o{ STATISTICAL_CATEGORY : defines
+    STATISTICAL_CATEGORY ||--o{ STATISTIC : classifies
+    SYNC_RUN ||--o{ STATISTIC : last_observed
+    STATISTIC ||--o{ STATISTIC_VERSION : versions
+    SYNC_RUN ||--o{ STATISTIC_VERSION : creates
+    SYNC_RUN ||--o{ IMPORT_SOURCE : downloads
+    SYNC_RUN ||--o{ DATA_COVERAGE : records
+    STATISTIC ||--o{ STATISTIC_OBSERVATION : tracks
+    STATISTIC_VERSION ||--o{ STATISTIC_OBSERVATION : references
+    IMPORT_SOURCE ||--o{ STATISTIC_OBSERVATION : supplies
+    SYNC_RUN ||--o{ STATISTIC_OBSERVATION : collects
+
+    GEOGRAPHY {
+        bigint id PK
+        string code
+        string level "state, city, neighborhood or district"
+        string name
+        integer reference_year
+        bigint parent_id FK "Nullable for a state"
+    }
+    STATISTICAL_INDICATOR {
+        string code PK
+        string name
+        string unit
+        string universe
+    }
+    STATISTICAL_CATEGORY {
+        bigint id PK
+        string indicator_id FK
+        string code
+        string name
+        integer age_min "Nullable"
+        integer age_max "Nullable"
+    }
+    STATISTIC {
+        bigint id PK
+        uuid integration_id FK
+        bigint geography_id FK
+        bigint category_id FK
+        string period
+        decimal value "Nullable for missing or suppressed values"
+        string source_status
+        integer version
+        string fingerprint
+        datetime first_seen_at
+        datetime last_seen_at
+        uuid last_run_id FK
+    }
+    STATISTIC_VERSION {
+        bigint id PK
+        bigint statistic_id FK
+        integer version
+        decimal value "Nullable"
+        string source_status
+        string fingerprint
+        uuid run_id FK
+        datetime created_at
+    }
+    IMPORT_SOURCE {
+        bigint id PK
+        uuid run_id FK
+        string code
+        string url
+        string sha256
+        string reference_period
+        datetime collected_at
+    }
+    STATISTIC_OBSERVATION {
+        bigint id PK
+        bigint statistic_id FK
+        bigint statistic_version_id FK
+        bigint source_id FK
+        uuid run_id FK
+        string source_columns
+        string transformation_version
+        datetime collected_at
+    }
+    DATA_COVERAGE {
+        bigint id PK
+        uuid run_id FK
+        string level
+        string parent_code "Logical official code, not a foreign key"
+        string status
+        integer record_count
+        string message
+    }
+```
+
+Geography is unique by code, level and reference year. Category is unique by indicator and category code.
+Statistic is unique by integration, geography, category and period. Version is unique by statistic and
+version number; observation by statistic and run; source by run and source code. Statistical versions,
+observations, source artifacts and coverage evidence are append-only. Geography metadata is shared,
+while values and lineage are scoped through the owning integration. See [IBGE semantics and coverage](ibge-integration.md).

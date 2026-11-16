@@ -4,8 +4,14 @@ from . import docs
 from .token_views import token
 from . import identity
 from . import integrations, event_views
+from . import statistics_views
 
 urlpatterns = [
+    path('api/v1/geographies/', statistics_views.geographies),
+    path('api/v1/demographics/', statistics_views.statistics),
+    path('api/v1/demographics/<int:statistic_id>/versions/', statistics_views.versions),
+    path('api/v1/demographics/<int:statistic_id>/observations/', statistics_views.observations),
+    path('api/v1/ibge/coverage/', statistics_views.coverage),
     path('api/v1/integration-providers/', integrations.providers),
     path('api/v1/integrations/', integrations.integrations),
     path('api/v1/integrations/<uuid:integration_id>/', integrations.integration_detail),

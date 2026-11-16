@@ -1,8 +1,15 @@
 # Sympla Integration
 
 A relational business database fed by integrations, intended to support reports and sales insights
-for people and AI systems. The first implemented domain is events, collected from Sympla through
-daily or on-demand API synchronization. File uploads, sales entities and report generation are future work.
+for people and AI systems. Implemented domains are Sympla events and IBGE Census 2022 population, age and income statistics, collected through
+daily or on-demand integration jobs. File uploads, sales entities and report generation are future work.
+
+## Modular integration containers
+
+Sympla and IBGE run in separate Docker services and images: `integration-sympla` and `integration-ibge`.
+The PostgreSQL relational database and authenticated API are shared. Start all services with `python start.py`.
+See [IBGE configuration, supported geography levels and coverage](docs/ibge-integration.md) for the
+São Paulo/SP example, official indicators, query endpoints and honest neighborhood/district distinctions.
 
 ## Relational events, integration CRUD and lineage
 
@@ -53,7 +60,7 @@ to the API account: multiple Sympla integrations for the same API account use th
 not separate Sympla credentials. No arbitrary upstream URLs or dynamic code imports are accepted.
 Future connectors implement configuration_error, collect and normalize through the explicit registry
 in core/connectors.py; they reuse the same transactional persistence, versioning and lineage pipeline.
-Only Sympla is available in the production registry today.
+The production registry contains Sympla event and IBGE statistical connectors.
 
 Schedule creation and POST `/api/v1/sync/` accept an optional integration_id. Omission selects the
 active default integration. Existing schedules remain linked to their migrated integration. Pending
@@ -81,7 +88,7 @@ new imports record them from this version onward. Missing events are not inferre
 ## Start
 
 Requirements: Python 3.10+ on the host and Docker Desktop/Engine with Linux containers and Docker Compose v2.
-The API and worker run on Python 3.13 in Docker. A host virtual environment is not required.
+The API and integration containers run on Python 3.13 in Docker. A host virtual environment is not required.
 
 ```powershell
 python start.py
@@ -310,6 +317,7 @@ delete them without the corresponding grants. The same applies to custom roles a
 | roles | Custom role creation, metadata and role permission replacement |
 | authorization | Permission catalogue and individual access grants |
 | integrations | Owned integration configurations and registered connector catalogue |
+| demographics | Imported IBGE geography, population, age, income and statistical lineage reads |
 | schedules | Daily schedules |
 | synchronization | Manual imports and synchronization runs |
 | events | Imported events and immutable versions |

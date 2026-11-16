@@ -447,3 +447,5 @@ from .identity_schema import extend
 extend(SCHEMA)
 from .integration_schema import extend as extend_integrations
 extend_integrations(SCHEMA)
+from .statistics_schema import extend as extend_statistics
+extend_statistics(SCHEMA)

@@ -87,6 +87,7 @@ class Integration(models.Model):
     owner = models.ForeignKey(ApiUser, on_delete=models.PROTECT)
     name = models.CharField(max_length=80)
     provider = models.CharField(max_length=32)
+    configuration = models.JSONField(default=dict)
     active = models.BooleanField(default=True)
     is_default = models.BooleanField(default=False)
     revision = models.PositiveIntegerField(default=1)
@@ -150,7 +151,7 @@ class SyncRun(models.Model):
             ),
             models.CheckConstraint(
                 condition=(
-                    Q(status="running", running_slot=1, running_slot__isnull=False)
+                    Q(status="running", running_slot__in=[1, 2], running_slot__isnull=False)
                     | (~Q(status="running") & Q(running_slot__isnull=True))
                 ),
                 name="valid_running_slot",
@@ -268,3 +269,96 @@ class ApiRequestLog(models.Model):
     method = models.CharField(max_length=10)
     path = models.CharField(max_length=200)
     http_status = models.PositiveSmallIntegerField()
+
+
+class Geography(models.Model):
+    code = models.CharField(max_length=20)
+    level = models.CharField(max_length=20, choices=[('state', 'State'), ('city', 'City'), ('neighborhood', 'Neighborhood'), ('district', 'District')])
+    name = models.CharField(max_length=200)
+    reference_year = models.PositiveSmallIntegerField(default=2022)
+    parent = models.ForeignKey('self', null=True, on_delete=models.PROTECT)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=['code', 'level', 'reference_year'], name='unique_geography_reference')]
+
+
+class StatisticalIndicator(models.Model):
+    code = models.CharField(max_length=80, primary_key=True)
+    name = models.CharField(max_length=200)
+    unit = models.CharField(max_length=40)
+    universe = models.CharField(max_length=250)
+
+
+class StatisticalCategory(models.Model):
+    indicator = models.ForeignKey(StatisticalIndicator, on_delete=models.PROTECT)
+    code = models.CharField(max_length=40)
+    name = models.CharField(max_length=100)
+    age_min = models.PositiveSmallIntegerField(null=True)
+    age_max = models.PositiveSmallIntegerField(null=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=['indicator', 'code'], name='unique_indicator_category')]
+
+
+class Statistic(models.Model):
+    integration = models.ForeignKey(Integration, on_delete=models.PROTECT)
+    geography = models.ForeignKey(Geography, on_delete=models.PROTECT)
+    category = models.ForeignKey(StatisticalCategory, on_delete=models.PROTECT)
+    period = models.CharField(max_length=20, default='2022')
+    value = models.DecimalField(max_digits=24, decimal_places=6, null=True)
+    source_status = models.CharField(max_length=30, default='available')
+    fingerprint = models.CharField(max_length=64)
+    version = models.PositiveIntegerField(default=1)
+    first_seen_at = models.DateTimeField(default=django_timezone.now)
+    last_seen_at = models.DateTimeField(default=django_timezone.now)
+    last_run = models.ForeignKey(SyncRun, on_delete=models.PROTECT)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=['integration', 'geography', 'category', 'period'], name='unique_statistic_series')]
+
+
+class StatisticVersion(models.Model):
+    statistic = models.ForeignKey(Statistic, on_delete=models.PROTECT)
+    version = models.PositiveIntegerField()
+    value = models.DecimalField(max_digits=24, decimal_places=6, null=True)
+    source_status = models.CharField(max_length=30)
+    fingerprint = models.CharField(max_length=64)
+    run = models.ForeignKey(SyncRun, on_delete=models.PROTECT)
+    created_at = models.DateTimeField(default=django_timezone.now)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=['statistic', 'version'], name='unique_statistic_version')]
+
+
+class ImportSource(models.Model):
+    run = models.ForeignKey(SyncRun, on_delete=models.PROTECT)
+    code = models.CharField(max_length=80)
+    url = models.TextField()
+    sha256 = models.CharField(max_length=64)
+    reference_period = models.CharField(max_length=20)
+    collected_at = models.DateTimeField()
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=['run', 'code'], name='unique_run_source')]
+
+
+class StatisticObservation(models.Model):
+    statistic = models.ForeignKey(Statistic, on_delete=models.PROTECT)
+    statistic_version = models.ForeignKey(StatisticVersion, on_delete=models.PROTECT)
+    source = models.ForeignKey(ImportSource, on_delete=models.PROTECT)
+    run = models.ForeignKey(SyncRun, on_delete=models.PROTECT)
+    source_columns = models.CharField(max_length=200)
+    transformation_version = models.CharField(max_length=80)
+    collected_at = models.DateTimeField()
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=['statistic', 'run'], name='unique_statistic_run_observation')]
+
+
+class DataCoverage(models.Model):
+    run = models.ForeignKey(SyncRun, on_delete=models.PROTECT)
+    level = models.CharField(max_length=20)
+    parent_code = models.CharField(max_length=20)
+    status = models.CharField(max_length=30)
+    record_count = models.PositiveIntegerField(default=0)
+    message = models.CharField(max_length=250)

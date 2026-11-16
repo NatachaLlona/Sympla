@@ -41,14 +41,14 @@ between ticks after finishing its current work; external collection may therefor
 
 ```mermaid
 flowchart TD
-    TICK["Worker tick: enqueue due schedules, then process one run"] --> SLOT{"Another run already running?"}
+    TICK["Worker tick: enqueue due schedules, then process one run"] --> SLOT{"Another run for this provider already running?"}
     SLOT -->|Yes| WAIT["No run claimed; retry on a later tick"]
     SLOT -->|No| JOB{"Queued run available?"}
     JOB -->|No| WAIT
     JOB -->|Yes| AUTH{"Owner still authorized and integration active, owned and nondeleted?"}
     AUTH -->|No| CANCEL["Mark run cancelled and append audit record"]
     AUTH -->|Yes| CLAIM["Snapshot provider version, integration revision and connector version"]
-    CLAIM --> RUNNING["Set running status and global running slot; audit start"]
+    CLAIM --> RUNNING["Set running status and provider running slot; audit start"]
     RUNNING --> COLLECT["Registered connector collects events using API-account credentials"]
     COLLECT --> FETCH{"Collection successful?"}
     FETCH -->|No| FAIL["Mark run failed, release slot, append safe failure audit and server log"]
@@ -60,7 +60,7 @@ flowchart TD
 ```
 
 The network request runs outside the persistence transaction. Claiming uses the Coordinator lock and
-a unique global running slot, so only one import runs at a time. Changing provider credentials,
+a unique provider running slot, so one import per provider runs at a time. Changing provider credentials,
 integration configuration or authorization during collection prevents stale data from committing.
 The version values are captured when the worker claims a job, rather than when the job is queued.
 
@@ -120,3 +120,24 @@ flowchart TD
 GET requires `integrations:read`, POST requires `integrations:write`, PATCH requires
 `integrations:edit`, and DELETE requires `integrations:delete`. Configuration mutations and their
 audit records commit together. Integration management permissions do not themselves authorize an import.
+
+## Statistical import branch
+
+```mermaid
+flowchart TD
+    CLAIM[IBGE container claims only IBGE jobs] --> SCOPE[Validate configured states and municipalities]
+    SCOPE --> FETCH[Download bounded official ZIP and CSV products]
+    FETCH --> MAP[Map original codes to population, age and income indicators]
+    MAP --> COVERAGE[Record missing neighborhoods, explicit districts and different source universes]
+    COVERAGE --> STATE[Read state income directly from the official aggregate API]
+    STATE --> ATOMIC[Begin statistical persistence transaction and recheck authorization and integration revision]
+    ATOMIC --> GEO[Relate geography, indicator, category, period and exact decimal value]
+    GEO --> VERSION[Append a content version only when value or source status changes]
+    VERSION --> OBSERVE[Append observation and source checksum even when unchanged]
+    OBSERVE --> COMMIT[Commit statistics, provenance, coverage and success or partial status together]
+    ATOMIC -->|Any persistence error| ROLLBACK[Roll back batch and record failed run separately]
+```
+
+State income failures are coverage gaps, not inferred municipal averages. A completed run is partial
+when official data is unavailable, suppressed or has different source universes. Sympla event imports
+continue to use the event persistence branch above; statistical records never enter event tables.

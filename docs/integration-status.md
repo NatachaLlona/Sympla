@@ -12,8 +12,10 @@ migration and the Docker startup/persistence checks. Existing API credentials an
 
 Delivery branch: `feat/sympla-integration`, integrated into `main`.
 
-## IBGE data integration: next development stage
+## IBGE data integration: initial implementation
 
 Development branch: `feat/ibge-integration`, starting from the completed Sympla delivery in `main`.
-IBGE connectors, datasets and endpoints have not been implemented. Their scope will be defined in the
-next stage using the registered connector architecture and the existing authorization and lineage patterns.
+The initial implementation imports Census 2022 population, age and income through an independent IBGE
+container. Relational statistics, immutable lineage and explicit geographical coverage are documented in
+[IBGE integration](ibge-integration.md). São Paulo uses official districts as an explicitly labeled fallback
+when the official neighborhood product has no records; unavailable state income remains a reported gap.

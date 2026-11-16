@@ -342,13 +342,14 @@ def main(argv=None):
             print("Containers stopped. Database volume and credentials were preserved.")
             return 0
         if args.logs:
-            run(base + ["logs", "--follow", "api", "worker"], env)
+            run(base + ["logs", "--follow", "api", "integration-sympla", "integration-ibge"], env)
             return 0
         print("Building the application and starting PostgreSQL...")
-        run(base + ["build", "api"], env)
+        run(base + ["build", "api", "integration-sympla", "integration-ibge"], env)
         run(base + ["up", "--detach", "--wait", "db"], env)
         # Do not let a previous application version write during ownership/schema migrations.
-        run(base + ["stop", "api", "worker"], env)
+        run(base + ["stop", "api", "worker", "integration-sympla", "integration-ibge"], env)
+        run(base + ["rm", "--force", "worker"], env)
         run(base + ["run", "--rm", "--no-deps", "bootstrap"], env)
         # The API client secret is only needed to create/rotate its password hash.
         write_file(state_dir / "client_secret", "")
@@ -358,12 +359,12 @@ def main(argv=None):
         app_up = ["up", "--detach", "--wait"]
         if args.configure_sympla:
             app_up.append("--force-recreate")
-        run(base + app_up + ["api", "worker"], env)
+        run(base + app_up + ["api", "integration-sympla", "integration-ibge"], env)
         print(f"Ready. Swagger: http://127.0.0.1:{config ['api']['port']}/docs/")
         print(
             f"Client ID: {state ['client_id']}. Use your client secret in Swagger Authorize."
         )
-        print("The worker is running in Docker. You may close this terminal.")
+        print("The Sympla and IBGE integration containers are running independently. You may close this terminal.")
         return 0
     except (StartupError, OSError, json.JSONDecodeError) as exc:
         print(

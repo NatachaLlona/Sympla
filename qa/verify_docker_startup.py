@@ -81,7 +81,7 @@ def main():
     token = result["access_token"]
     assert result["expires_in"] == 120
     master_info = request("/me", token=token)
-    assert master_info["is_superuser"] and set(master_info["permissions"]) == {f"{section}:{action}" for section in ("identity", "roles", "authorization", "integrations", "schedules", "synchronization", "events", "audit") for action in ("read", "write", "edit", "delete")}
+    assert master_info["is_superuser"] and set(master_info["permissions"]) == {f"{section}:{action}" for section in ("identity", "roles", "authorization", "integrations", "demographics", "schedules", "synchronization", "events", "audit") for action in ("read", "write", "edit", "delete")}
     suffix = uuid.uuid4().hex[:8]
     role = request(
         "/roles", {"name": "QA reader " + suffix, "permissions": ["events:read"]}, token
@@ -223,6 +223,9 @@ def main():
                 "has_table_privilege(current_user, 'core_eventobservation', 'DELETE')"
             )
             assert cursor.fetchone() == (True, False, False)
+            for table in ('core_statisticversion', 'core_statisticobservation', 'core_importsource', 'core_datacoverage'):
+                cursor.execute('SELECT has_table_privilege(current_user, %s, %s), has_table_privilege(current_user, %s, %s)', (table, 'UPDATE', table, 'DELETE'))
+                assert cursor.fetchone() == (False, False)
     assert launcher.main(args + ["--stop"]) == 0
     print(
         "PASS: Docker bootstrap, token endpoint, schedule persistence, worker, restart, credential rotation and restricted runtime role."

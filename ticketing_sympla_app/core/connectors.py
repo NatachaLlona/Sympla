@@ -1,38 +1,23 @@
 """Explicit connector registry. API input cannot select arbitrary code or URLs."""
-from dataclasses import dataclass
 from typing import Protocol
-from .sympla import fetch_events, configuration_error, SyncError
-from .provider_secrets import decrypt_token
+from .sync_exception import SyncError
+from .integration_modules.sympla.connector import SymplaConnector
+from .integration_modules.ibge.connector import IbgeConnector
 
 
-class EventConnector(Protocol):
+class IntegrationConnector(Protocol):
     code: str
     version: str
     credential_scope: str
+    domain: str
+    running_slot: int
 
     def configuration_error(self, integration, api_account) -> str | None: ...
-    def collect(self, integration, api_account) -> list[dict]: ...
-    def normalize(self, payload: dict) -> dict: ...
+    def collect(self, integration, api_account) -> list[dict] | dict: ...
+    def validate_configuration(self, configuration: dict) -> dict: ...
 
 
-@dataclass(frozen=True)
-class SymplaConnector:
-    code: str = 'sympla'
-    version: str = 'sympla.events.v1'
-    credential_scope: str = 'api_account'
-
-    def configuration_error(self, integration, api_account):
-        return configuration_error(decrypt_token(api_account))
-
-    def collect(self, integration, api_account):
-        return fetch_events(token=decrypt_token(api_account))
-
-    def normalize(self, payload):
-        from .event_mapping import normalize
-        return normalize(payload)
-
-
-CONNECTORS: dict[str, EventConnector] = {'sympla': SymplaConnector()}
+CONNECTORS: dict[str, IntegrationConnector] = {'sympla': SymplaConnector(), 'ibge': IbgeConnector()}
 
 
 def connector_for(code):

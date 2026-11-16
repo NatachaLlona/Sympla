@@ -47,6 +47,7 @@ class DocumentationTests(SimpleTestCase):
         for path in spec["paths"]:
             actual_path = (
                 path.replace("{schedule_id}", "1")
+                .replace("{statistic_id}", "1")
                 .replace("{integration_id}", "00000000-0000-0000-0000-000000000001")
                 .replace("{event_id}", "1")
                 .replace("{run_id}", "00000000-0000-0000-0000-000000000001")

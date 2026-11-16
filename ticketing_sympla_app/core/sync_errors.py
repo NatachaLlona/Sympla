@@ -1,4 +1,10 @@
 MESSAGES = {
+    'ibge_configuration': 'Configure the IBGE integration geography scope before importing.',
+    'ibge_http_error': 'IBGE returned an unsuccessful HTTP response. Check the run coverage details.',
+    'ibge_connection_error': 'Could not read an official IBGE source. Check network availability.',
+    'ibge_response_limit': 'An IBGE product exceeded the bounded download or extraction limits.',
+    'ibge_invalid_response': 'An official IBGE product did not match the validated schema.',
+    'ibge_unknown_geography': 'An IBGE code was not found in the Census 2022 geography reference.',
     'unsupported_integration': 'No connector is registered for this integration provider.',
     'integration_unavailable': 'The integration is inactive or deleted.',
     'integration_changed': 'The integration changed during the import. No event changes were committed.',

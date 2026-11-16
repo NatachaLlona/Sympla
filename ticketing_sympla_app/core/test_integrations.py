@@ -38,7 +38,7 @@ class IntegrationTests(TestCase):
         self.assertEqual(result.status_code, 201, result.content)
         return Integration.objects.get(pk=result.json()['id'])
 
-    @patch('core.connectors.fetch_events')
+    @patch('core.integration_modules.sympla.connector.fetch_events')
     def test_relational_projection_versions_and_unchanged_lineage(self, fetch):
         payload = {'id': 'event-1', 'name': 'Conference', 'start_date': '2026-12-01 09:00:00',
                    'published': True, 'address': {'city': 'Lisbon', 'country': 'Portugal'},
@@ -81,7 +81,7 @@ class IntegrationTests(TestCase):
         self.assertEqual(response['address']['city'], 'Porto')
         self.assertNotIn('isolated-provider-secret', json.dumps(response))
 
-    @patch('core.connectors.fetch_events', return_value=[{'id': 'same-id', 'name': 'An event'}])
+    @patch('core.integration_modules.sympla.connector.fetch_events', return_value=[{'id': 'same-id', 'name': 'An event'}])
     def test_sources_have_independent_external_identifiers(self, fetch):
         second = self.create_integration()
         for integration in (self.integration, second):
@@ -124,7 +124,7 @@ class IntegrationTests(TestCase):
             self.assertEqual(self.request('patch', path, {'name': 'Updated'}, header).status_code, 200 if action == 'edit' else 403)
             self.assertEqual(self.request('delete', path, header=header).status_code, 204 if action == 'delete' else 403)
 
-    @patch('core.connectors.fetch_events', return_value=[{'id': 'kept', 'name': 'Preserved'}])
+    @patch('core.integration_modules.sympla.connector.fetch_events', return_value=[{'id': 'kept', 'name': 'Preserved'}])
     def test_soft_delete_preserves_history_and_cancels_work(self, fetch):
         enqueue('tester', owner=self.master)
         process_one()
@@ -141,7 +141,7 @@ class IntegrationTests(TestCase):
         self.assertEqual(self.request('post', '/api/v1/sync/', {}).status_code, 409)
         self.assertTrue(AuditLog.objects.filter(action='integration.deleted').exists())
 
-    @patch('core.connectors.fetch_events')
+    @patch('core.integration_modules.sympla.connector.fetch_events')
     def test_integration_change_during_collection_rolls_back(self, fetch):
         def collect(**kwargs):
             Integration.objects.filter(pk=self.integration.pk).update(active=False, revision=2)
@@ -152,14 +152,14 @@ class IntegrationTests(TestCase):
         self.assertFalse(Event.objects.exists())
         self.assertFalse(EventObservation.objects.exists())
 
-    @patch('core.connectors.fetch_events', return_value=[{'id': 'valid', 'address': {'city': 'Lisbon'}}, {'id': 'invalid', 'published': 'invalid'}])
+    @patch('core.integration_modules.sympla.connector.fetch_events', return_value=[{'id': 'valid', 'address': {'city': 'Lisbon'}}, {'id': 'invalid', 'published': 'invalid'}])
     def test_relations_and_observations_rollback_together(self, fetch):
         enqueue('tester', owner=self.master)
         self.assertEqual(process_one().error_code, 'upstream_invalid_event')
         for model in (Event, EventAddress, EventVersion, EventObservation):
             self.assertFalse(model.objects.exists())
 
-    @patch('core.connectors.fetch_events', return_value=[{'id': 'immutable'}])
+    @patch('core.integration_modules.sympla.connector.fetch_events', return_value=[{'id': 'immutable'}])
     def test_observation_history_is_append_only(self, fetch):
         enqueue('tester', owner=self.master)
         process_one()

@@ -1,5 +1,7 @@
 x-app: &app
-  build: .
+  build:
+    context: .
+    target: api
   image: ${COMPOSE_PROJECT_NAME:-sympla}-app
   init: true
   environment: &app-env
@@ -70,10 +72,42 @@ services:
       retries: 12
   worker:
     <<: *app
+    profiles: [legacy]
     stop_grace_period: 360s
     command: [python, manage.py, sync_worker]
     depends_on:
       db: {condition: service_healthy}
+  integration-sympla:
+    <<: *app
+    build: {context: ., target: integration-sympla}
+    image: ${COMPOSE_PROJECT_NAME:-sympla}-integration-sympla
+    stop_grace_period: 360s
+    command: [python, manage.py, sync_worker, --provider, sympla]
+    depends_on:
+      db: {condition: service_healthy}
+    healthcheck:
+      test: [CMD, python, -c, "import os,time; assert time.time()-os.path.getmtime('/tmp/worker-heartbeat') < 400"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+  integration-ibge:
+    <<: *app
+    build: {context: ., target: integration-ibge}
+    image: ${COMPOSE_PROJECT_NAME:-sympla}-integration-ibge
+    stop_grace_period: 360s
+    command: [python, manage.py, sync_worker, --provider, ibge]
+    environment:
+      <<: *app-env
+      PROVIDER_ENCRYPTION_KEY_FILE: ''
+      SYMPLA_API_HOST: ''
+    secrets: [django_secret, db_password]
+    depends_on:
+      db: {condition: service_healthy}
+    healthcheck:
+      test: [CMD, python, -c, "import os,time; assert time.time()-os.path.getmtime('/tmp/worker-heartbeat') < 400"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
 
 volumes:
   postgres_data:

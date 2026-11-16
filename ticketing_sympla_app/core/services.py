@@ -84,7 +84,7 @@ def enqueue(
 
 
 @transaction.atomic
-def enqueue_due(now=None):
+def enqueue_due(now=None, provider=None):
     Coordinator.objects.select_for_update().get(pk=1)
     now = now or timezone.now()
     count = 0
@@ -101,6 +101,8 @@ def enqueue_due(now=None):
         )
         .order_by("id")
     ):
+        if provider and schedule.integration.provider != provider:
+            continue
         if not permitted(schedule.owner, "synchronization:write"):
             continue
         enqueue(
@@ -115,19 +117,21 @@ def enqueue_due(now=None):
     return count
 
 
-def claim_run():
+def claim_run(provider=None):
     try:
         with transaction.atomic():
             Coordinator.objects.select_for_update().get(pk=1)
-            if SyncRun.objects.filter(status="running").exists():
-                return None
             run = (
                 SyncRun.objects.select_for_update()
-                .filter(status="queued")
+                .filter(status="queued", **({"integration__provider": provider} if provider else {}))
                 .order_by("created_at", "id")
                 .first()
             )
             if not run:
+                return None
+            connector = connector_for(run.integration.provider)
+            slot = getattr(connector, 'running_slot', 1)
+            if SyncRun.objects.filter(status='running', running_slot=slot).exists():
                 return None
             owner = ApiUser.objects.select_for_update().get(pk=run.owner_id)
             if not permitted(owner, "synchronization:write") or run.integration.owner_id != owner.pk or not run.integration.active or run.integration.deleted_at:
@@ -146,10 +150,10 @@ def claim_run():
                     owner=owner,
                 )
                 return None
-            run.provider_version = owner.provider_version
+            run.provider_version = owner.provider_version if connector.credential_scope == 'api_account' else 0
             run.integration_revision = run.integration.revision
             run.connector_version = connector_for(run.integration.provider).version
-            run.status, run.running_slot, run.started_at = "running", 1, timezone.now()
+            run.status, run.running_slot, run.started_at = "running", slot, timezone.now()
             run.save(
                 update_fields=[
                     "status",
@@ -273,14 +277,18 @@ def persist_events(run_id, payloads):
     return counts
 
 
-def process_one():
-    run = claim_run()
+def process_one(provider=None):
+    run = claim_run(provider)
     if run is None:
         return None
     try:
         owner = ApiUser.objects.get(pk=run.owner_id)
         payloads = connector_for(run.integration.provider).collect(run.integration, owner)
-        persist_events(run.pk, payloads)
+        if getattr(connector_for(run.integration.provider), 'domain', 'events') == 'statistics':
+            from .statistics_services import persist_statistics
+            persist_statistics(run.pk, payloads)
+        else:
+            persist_events(run.pk, payloads)
     except Exception as exc:
         code = (
             str(exc)

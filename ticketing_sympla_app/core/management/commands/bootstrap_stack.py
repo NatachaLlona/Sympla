@@ -112,7 +112,7 @@ class Command(BaseCommand):
                 cursor.execute(
                     sql.SQL(
                         "REVOKE UPDATE, DELETE ON core_auditlog, core_apirequestlog, "
-                        "core_eventversion, core_eventobservation, django_migrations FROM {}"
+                        "core_eventversion, core_eventobservation, core_statisticversion, core_statisticobservation, core_importsource, core_datacoverage, django_migrations FROM {}"
                     ).format(sql.Identifier(role))
                 )
         if not master.sympla_token_encrypted:

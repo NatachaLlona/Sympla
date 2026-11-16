@@ -1,6 +1,6 @@
 from .models import Permission, Role, AccessRule
 
-SECTIONS = ("identity", "roles", "authorization", "integrations", "schedules", "synchronization", "events", "audit")
+SECTIONS = ("identity", "roles", "authorization", "integrations", "demographics", "schedules", "synchronization", "events", "audit")
 ACTIONS = ("read", "write", "edit", "delete")
 PERMISSIONS = {
     f"{section}:{action}": f"{action.title()} {section} records"

@@ -29,7 +29,7 @@ def select_integration(api_account, value=None):
 
 def integration_data(integration):
     return {key: getattr(integration, key) for key in (
-        'id', 'name', 'provider', 'active', 'is_default', 'revision', 'created_at', 'updated_at'
+        'id', 'name', 'provider', 'configuration', 'active', 'is_default', 'revision', 'created_at', 'updated_at'
     )}
 
 
@@ -41,6 +41,17 @@ def validate(data):
     for field in ('active', 'is_default'):
         if field in data and type(data[field]) is not bool:
             raise ApiProblem('invalid_request', f'{field} must be a boolean.')
+
+
+def validate_configuration(data, provider):
+    try:
+        validator = getattr(CONNECTORS[provider], 'validate_configuration', None)
+        value = data.get('configuration', {})
+        if not isinstance(value, dict):
+            raise ValueError('configuration must be a JSON object.')
+        data['configuration'] = validator(value) if validator else value
+    except ValueError as exc:
+        raise ApiProblem('invalid_configuration', str(exc)) from None
 
 
 def record(request, integration, action, changes):
@@ -69,15 +80,16 @@ def clear_previous_default(request, selected_id=None):
 @api_endpoint(['GET'], section='integrations')
 def providers(request):
     return JsonResponse({'results': [{'code': item.code, 'connector_version': item.version,
-                                     'credential_scope': item.credential_scope} for item in CONNECTORS.values()]})
+                                     'credential_scope': item.credential_scope, 'domain': getattr(item, 'domain', 'events')} for item in CONNECTORS.values()]})
 
 
 @api_endpoint(['GET', 'POST'], section='integrations')
 def integrations(request):
     if request.method == 'GET':
         return collection(request, Integration.objects.filter(owner=request.api_user, deleted_at__isnull=True).order_by('created_at', 'id'), integration_data)
-    data = payload(request, ['name', 'provider', 'active', 'is_default'], ['name', 'provider'])
+    data = payload(request, ['name', 'provider', 'configuration', 'active', 'is_default'], ['name', 'provider'])
     validate(data)
+    validate_configuration(data, data['provider'])
     if Integration.objects.filter(owner=request.api_user, deleted_at__isnull=True).count() >= 100:
         raise ApiProblem('integration_limit', 'A maximum of 100 live integrations is allowed per API account.', 409)
     if data.get('is_default'):
@@ -103,10 +115,12 @@ def integration_detail(request, integration_id):
             audit(request.api_user.client_id, 'schedule.updated', 'schedule', schedule.pk,
                   {'active': {'before': True, 'after': False}, 'reason': 'integration_deleted'}, request.interaction_id, owner=request.api_user)
     else:
-        changes = payload(request, ['name', 'active', 'is_default'])
+        changes = payload(request, ['name', 'active', 'is_default', 'configuration'])
         if not changes:
             raise ApiProblem('invalid_request', 'Provide at least one integration field.')
         validate(changes)
+        if 'configuration' in changes:
+            validate_configuration(changes, integration.provider)
         if changes.get('is_default'):
             clear_previous_default(request, integration.pk)
         for key, value in changes.items():

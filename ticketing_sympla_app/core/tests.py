@@ -185,7 +185,7 @@ class ApiTests(TestCase):
         )
 
     @patch(
-        "core.connectors.fetch_events",
+        "core.integration_modules.sympla.connector.fetch_events",
         return_value=[{"id": "integration-event", "name": "Imported"}],
     )
     def test_api_to_worker_to_history(self, fetch):
@@ -279,7 +279,7 @@ class SyncTests(TestCase):
     def queue(self):
         return enqueue("tester", owner=self.api_account)
 
-    @patch("core.connectors.fetch_events")
+    @patch("core.integration_modules.sympla.connector.fetch_events")
     def test_versioning_and_nested_differences(self, fetch):
         fetch.return_value = [
             {
@@ -307,7 +307,7 @@ class SyncTests(TestCase):
         self.assertEqual(version.differences["/address/city"]["after"], "Porto")
         self.assertEqual(AuditLog.objects.filter(action="event.updated").count(), 1)
 
-    @patch("core.connectors.fetch_events")
+    @patch("core.integration_modules.sympla.connector.fetch_events")
     def test_failure_rolls_back_all_events_and_logs_failure(self, fetch):
         fetch.return_value = [
             {"id": "valid", "name": "valid"},
@@ -323,7 +323,7 @@ class SyncTests(TestCase):
         self.assertTrue(AuditLog.objects.filter(action="sync.failed").exists())
         self.assertIsNone(run.running_slot)
 
-    @patch("core.connectors.fetch_events", side_effect=SyncError("upstream_http_error"))
+    @patch("core.integration_modules.sympla.connector.fetch_events", side_effect=SyncError("upstream_http_error"))
     def test_upstream_failure_preserves_existing_events(self, fetch):
         Event.objects.create(
             integration=default_integration(self.api_account),
@@ -410,7 +410,7 @@ class FetchTests(TestCase):
         response.__enter__.return_value = response
         return response
 
-    @patch("core.sympla.requests.Session")
+    @patch("core.integration_modules.sympla.client.requests.Session")
     def test_has_next_does_not_use_quantity_as_total(self, session):
         client = session.return_value.__enter__.return_value
         client.get.side_effect = [
@@ -427,7 +427,7 @@ class FetchTests(TestCase):
         self.assertEqual(len(fetch_events(token="test-not-real")), 2)
         self.assertFalse(client.get.call_args.kwargs["allow_redirects"])
 
-    @patch("core.sympla.requests.Session")
+    @patch("core.integration_modules.sympla.client.requests.Session")
     def test_cursor_pagination(self, session):
         client = session.return_value.__enter__.return_value
         client.get.side_effect = [
@@ -439,7 +439,7 @@ class FetchTests(TestCase):
         self.assertEqual(len(fetch_events(token="test-not-real")), 2)
         self.assertEqual(client.get.call_args.kwargs["params"]["cursor"], "next")
 
-    @patch("core.sympla.requests.Session")
+    @patch("core.integration_modules.sympla.client.requests.Session")
     def test_terminal_page_can_omit_cursor_and_has_next(self, session):
         client = session.return_value.__enter__.return_value
         for batch, size in [
@@ -455,7 +455,7 @@ class FetchTests(TestCase):
             )
             self.assertEqual(fetch_events(token="test-not-real"), batch)
 
-    @patch("core.sympla.requests.Session")
+    @patch("core.integration_modules.sympla.client.requests.Session")
     def test_http_error_preserves_only_safe_status_and_page(self, session):
         session.return_value.__enter__.return_value.get.return_value = self.response(
             {"secret": "never-log"}, 401
@@ -467,7 +467,7 @@ class FetchTests(TestCase):
         )
         self.assertNotIn("never-log", str(error.exception))
 
-    @patch("core.sympla.requests.Session")
+    @patch("core.integration_modules.sympla.client.requests.Session")
     def test_invalid_pagination_redirect_and_duplicates(self, session):
         client = session.return_value.__enter__.return_value
         for response in [
@@ -483,7 +483,7 @@ class FetchTests(TestCase):
                 fetch_events(token="test-not-real")
 
     @override_settings(SYMPLA_API_HOST="https://attacker.example")
-    @patch("core.sympla.requests.Session")
+    @patch("core.integration_modules.sympla.client.requests.Session")
     def test_disallowed_host_never_receives_token(self, session):
         with self.assertRaises(SyncError):
             fetch_events(token="test-not-real")
