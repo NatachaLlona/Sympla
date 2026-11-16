@@ -1,5 +1,12 @@
 # Integration delivery status
 
+## Demographic frontend
+
+The `frontend` container provides a read-only demographic explorer, source lineage and CSV export.
+It uses the existing API and `demographics:read` permission; provider integrations remain independent.
+Calendar-year cohort alignment advances the published age bands without overwriting census values
+or inferring post-census births. See [frontend behavior and validation](demographic-frontend.md).
+
 ## Sympla event integration: completed
 
 The completed delivery covers API-account-scoped Sympla event imports, daily schedules and manual

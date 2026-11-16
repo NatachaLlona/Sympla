@@ -81,23 +81,26 @@ def read_jsonc(path):
 def load_config(path):
     data = read_jsonc(path)
     try:
-        if set(data) != {"database", "api", "auth", "docker"}:
+        if set(data) - {"database", "api", "auth", "docker", "frontend"} or {"database", "api", "auth", "docker"} - data.keys():
             raise ValueError()
+        data.setdefault('frontend', {'port': 8011})
         if (
             set(data["database"]) != {"name", "port"}
             or set(data["api"]) != {"port"}
             or set(data["auth"]) != {"token_ttl_seconds"}
             or set(data["docker"]) != {"project_name"}
+            or set(data['frontend']) != {'port'}
         ):
             raise ValueError()
         if not re.fullmatch(r"[A-Za-z][A-Za-z0-9_]{0,62}", data["database"]["name"]):
             raise ValueError()
         if not re.fullmatch(r"[a-z][a-z0-9_-]{2,40}", data["docker"]["project_name"]):
             raise ValueError()
-        for port in [data["database"]["port"], data["api"]["port"]]:
+        ports = [data["database"]["port"], data["api"]["port"], data['frontend']['port']]
+        for port in ports:
             if type(port) is not int or not 1024 <= port <= 65535:
                 raise ValueError()
-        if data["database"]["port"] == data["api"]["port"]:
+        if len(set(ports)) != len(ports):
             raise ValueError()
         ttl = data["auth"]["token_ttl_seconds"]
         if type(ttl) is not int or not 60 <= ttl <= 86400:
@@ -183,6 +186,7 @@ def compose_environment(config, state_dir, state):
             "DB_PORT": str(config["database"]["port"]),
             "DB_USER": state["database_user"],
             "API_PORT": str(config["api"]["port"]),
+            "FRONTEND_PORT": str(config['frontend']['port']),
             "API_TOKEN_TTL_SECONDS": str(config["auth"]["token_ttl_seconds"]),
             "API_CLIENT_ID": state["client_id"],
             "ROTATE_INITIAL_CLIENT": (
@@ -342,13 +346,13 @@ def main(argv=None):
             print("Containers stopped. Database volume and credentials were preserved.")
             return 0
         if args.logs:
-            run(base + ["logs", "--follow", "api", "integration-sympla", "integration-ibge"], env)
+            run(base + ["logs", "--follow", "api", "integration-sympla", "integration-ibge", "frontend"], env)
             return 0
         print("Building the application and starting PostgreSQL...")
-        run(base + ["build", "api", "integration-sympla", "integration-ibge"], env)
+        run(base + ["build", "api", "integration-sympla", "integration-ibge", "frontend"], env)
         run(base + ["up", "--detach", "--wait", "db"], env)
         # Do not let a previous application version write during ownership/schema migrations.
-        run(base + ["stop", "api", "worker", "integration-sympla", "integration-ibge"], env)
+        run(base + ["stop", "api", "worker", "integration-sympla", "integration-ibge", "frontend"], env)
         run(base + ["rm", "--force", "worker"], env)
         run(base + ["run", "--rm", "--no-deps", "bootstrap"], env)
         # The API client secret is only needed to create/rotate its password hash.
@@ -359,7 +363,8 @@ def main(argv=None):
         app_up = ["up", "--detach", "--wait"]
         if args.configure_sympla:
             app_up.append("--force-recreate")
-        run(base + app_up + ["api", "integration-sympla", "integration-ibge"], env)
+        run(base + app_up + ["api", "integration-sympla", "integration-ibge", "frontend"], env)
+        print(f"Frontend: http://127.0.0.1:{config['frontend']['port']}/")
         print(f"Ready. Swagger: http://127.0.0.1:{config ['api']['port']}/docs/")
         print(
             f"Client ID: {state ['client_id']}. Use your client secret in Swagger Authorize."

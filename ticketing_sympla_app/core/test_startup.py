@@ -27,6 +27,16 @@ class StartupTests(SimpleTestCase):
         config = launcher.load_config(ROOT / "config.jsonc")
         self.assertEqual(config["database"], {"name": "Simpla", "port": 2424})
         self.assertEqual(config["api"]["port"], 8010)
+        self.assertEqual(config['frontend']['port'], 8011)
+
+    def test_frontend_port_is_optional_for_legacy_configs_and_must_be_distinct(self):
+        config = {'database': {'name': 'Simpla', 'port': 2424}, 'api': {'port': 8010},
+                  'auth': {'token_ttl_seconds': 3600}, 'docker': {'project_name': 'sympla'}}
+        with patch.object(launcher, 'read_jsonc', return_value=config):
+            self.assertEqual(launcher.load_config('fixture')['frontend']['port'], 8011)
+        config['frontend']['port'] = 8010
+        with patch.object(launcher, 'read_jsonc', return_value=config), self.assertRaises(launcher.StartupError):
+            launcher.load_config('fixture')
 
     def test_invalid_password_reprompts_in_english(self):
         with patch.object(

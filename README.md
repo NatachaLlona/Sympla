@@ -87,6 +87,11 @@ new imports record them from this version onward. Missing events are not inferre
 
 ## Start
 
+The [demographic frontend](docs/demographic-frontend.md) runs in its own container at
+**http://127.0.0.1:8011/**. Search imported IBGE age cohorts by location and analysis year, inspect
+calculation bounds and provenance, and export CSV. Ages are aligned by the calendar-year difference
+from the source census; this does not model births, deaths or migration.
+
 Requirements: Python 3.10+ on the host and Docker Desktop/Engine with Linux containers and Docker Compose v2.
 The API and integration containers run on Python 3.13 in Docker. A host virtual environment is not required.
 
@@ -116,6 +121,7 @@ Edit config.jsonc before first launch. Comments and trailing commas are supporte
 {
   "database": { "name": "Simpla", "port": 2424 },
   "api": { "port": 8010 },
+  "frontend": { "port": 8011 },
   "auth": { "token_ttl_seconds": 3600 },
   "docker": { "project_name": "sympla" }
 }

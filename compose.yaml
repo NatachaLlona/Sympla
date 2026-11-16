@@ -28,6 +28,22 @@ x-app: &app
   restart: unless-stopped
 
 services:
+  frontend:
+    build: ./frontend
+    image: ${COMPOSE_PROJECT_NAME:-sympla}-frontend
+    ports: ['127.0.0.1:${FRONTEND_PORT:-8011}:8080']
+    depends_on:
+      api: {condition: service_healthy}
+    read_only: true
+    tmpfs: [/tmp]
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+    restart: unless-stopped
+    healthcheck:
+      test: [CMD, wget, -q, --spider, http://127.0.0.1:8080/health]
+      interval: 5s
+      timeout: 5s
+      retries: 12
   db:
     image: postgres:17-alpine
     environment:

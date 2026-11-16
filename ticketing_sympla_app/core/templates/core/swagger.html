@@ -21,6 +21,19 @@
       requestInterceptor: (request) => {
         request.credentials = 'omit';
         return request;
+      },
+      responseInterceptor: (response) => {
+        const connection = '{{ frontend_connection }}';
+        if (connection && window.parent !== window && response.status === 200 &&
+            new URL(response.url, window.location.origin).pathname === '/api/v1/token/') {
+          let body = response.obj;
+          if (!body) { try { body = JSON.parse(response.text || response.data || '{}'); } catch (_) {} }
+          if (body && typeof body.access_token === 'string' && body.token_type === 'Bearer') {
+            window.parent.postMessage({type: 'demographics:authorized', connection,
+              accessToken: body.access_token, expiresIn: body.expires_in}, window.location.origin);
+          }
+        }
+        return response;
       }
     });
     ui.initOAuth({useBasicAuthenticationWithAccessCodeGrant: false});

@@ -5,8 +5,11 @@ from .token_views import token
 from . import identity
 from . import integrations, event_views
 from . import statistics_views
+from . import cohort_search
 
 urlpatterns = [
+    path('api/v1/demographics/explorer-options/', cohort_search.options),
+    path('api/v1/demographics/search/', cohort_search.search),
     path('api/v1/geographies/', statistics_views.geographies),
     path('api/v1/demographics/', statistics_views.statistics),
     path('api/v1/demographics/<int:statistic_id>/versions/', statistics_views.versions),

@@ -449,3 +449,5 @@ from .integration_schema import extend as extend_integrations
 extend_integrations(SCHEMA)
 from .statistics_schema import extend as extend_statistics
 extend_statistics(SCHEMA)
+from .cohort_schema import extend as extend_cohorts
+extend_cohorts(SCHEMA)

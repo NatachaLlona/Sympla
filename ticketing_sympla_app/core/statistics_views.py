@@ -38,6 +38,8 @@ def statistics(request):
 @api_endpoint(['GET'], section='demographics')
 def geographies(request):
     owned = Statistic.objects.filter(integration__owner=request.api_user)
+    if 'integration_id' in request.GET:
+        owned = owned.filter(integration_id=identifier(request.GET['integration_id']))
     query = Geography.objects.filter(Q(pk__in=owned.values('geography_id')) |
         Q(pk__in=owned.values('geography__parent_id')) | Q(pk__in=owned.values('geography__parent__parent_id'))).select_related('parent')
     for field in ('level', 'code'):
@@ -75,7 +77,15 @@ def observations(request, statistic_id):
 @api_endpoint(['GET'], section='demographics')
 def coverage(request):
     query = DataCoverage.objects.filter(run__owner=request.api_user).order_by('-id')
+    if 'integration_id' in request.GET:
+        query = query.filter(run__integration_id=identifier(request.GET['integration_id']))
     if 'run_id' in request.GET:
         query = query.filter(run_id=identifier(request.GET['run_id']))
+    latest = request.GET.get('latest', 'false')
+    if latest not in ('true', 'false'):
+        raise ApiProblem('invalid_request', 'latest must be true or false.')
+    if latest == 'true':
+        latest_run = query.order_by('-run__created_at', '-id').values_list('run_id', flat=True).first()
+        query = query.filter(run_id=latest_run) if latest_run else query.none()
     return collection(request, query, lambda row: {field: getattr(row, field) for field in
         ('id', 'run_id', 'level', 'parent_code', 'status', 'record_count', 'message')})

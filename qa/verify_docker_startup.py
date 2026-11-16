@@ -25,6 +25,7 @@ def main():
             {
                 "database": {"name": "SimplaQA", "port": 25424},
                 "api": {"port": 18010},
+                "frontend": {"port": 18011},
                 "auth": {"token_ttl_seconds": 120},
                 "docker": {"project_name": "sympla-startup-qa"},
             }
@@ -198,37 +199,37 @@ def main():
         )["token_type"]
         == "Bearer"
     )
-    import psycopg
-
-    with psycopg.connect(
-        host="127.0.0.1",
-        port=25424,
-        dbname="SimplaQA",
-        user="qa_runtime",
-        password="QaDatabase1!",
-    ) as db:
-        with db.cursor() as cursor:
-            cursor.execute(
-                "SELECT rolsuper, rolcreatedb, rolcreaterole FROM pg_roles WHERE rolname=current_user"
-            )
-            assert cursor.fetchone() == (False, False, False)
-            cursor.execute(
-                "SELECT has_table_privilege(current_user, 'core_auditlog', 'UPDATE'), "
-                "has_table_privilege(current_user, 'core_auditlog', 'TRUNCATE')"
-            )
-            assert cursor.fetchone() == (False, False)
-            cursor.execute(
-                "SELECT has_table_privilege(current_user, 'core_eventobservation', 'INSERT'), "
-                "has_table_privilege(current_user, 'core_eventobservation', 'UPDATE'), "
-                "has_table_privilege(current_user, 'core_eventobservation', 'DELETE')"
-            )
-            assert cursor.fetchone() == (True, False, False)
-            for table in ('core_statisticversion', 'core_statisticobservation', 'core_importsource', 'core_datacoverage'):
-                cursor.execute('SELECT has_table_privilege(current_user, %s, %s), has_table_privilege(current_user, %s, %s)', (table, 'UPDATE', table, 'DELETE'))
-                assert cursor.fetchone() == (False, False)
+    # Verify the actual runtime database role inside Docker; no host PostgreSQL driver is required.
+    permission_check = """
+from django.db import connection
+with connection.cursor() as cursor:
+ cursor.execute('SELECT rolsuper, rolcreatedb, rolcreaterole FROM pg_roles WHERE rolname=current_user')
+ assert cursor.fetchone() == (False, False, False)
+ cursor.execute("SELECT has_table_privilege(current_user, 'core_auditlog', 'UPDATE'), has_table_privilege(current_user, 'core_auditlog', 'TRUNCATE')")
+ assert cursor.fetchone() == (False, False)
+ for table in ('core_eventobservation', 'core_statisticversion', 'core_statisticobservation', 'core_importsource', 'core_datacoverage'):
+  cursor.execute('SELECT has_table_privilege(current_user, %s, %s), has_table_privilege(current_user, %s, %s), has_table_privilege(current_user, %s, %s)', (table, 'INSERT', table, 'UPDATE', table, 'DELETE'))
+  assert cursor.fetchone() == (True, False, False)
+print('Runtime database role privileges verified.')
+"""
+    subprocess.run(['docker', 'exec', 'sympla-startup-qa-api-1', 'python', 'manage.py', 'shell', '-c', permission_check], check=True)
+    frontend = 'http://127.0.0.1:18011'
+    with urlopen(frontend+'/', timeout=10) as response:
+        assert 'Demographic explorer' in response.read().decode()
+        assert "script-src 'self'" in response.headers['Content-Security-Policy']
+    with urlopen(frontend+'/app.js', timeout=10) as response:
+        assert 'demographics/search/' in response.read().decode()
+    with urlopen(frontend+'/docs/?frontend_connect='+'a'*32, timeout=10) as response:
+        assert response.headers.get_all('X-Frame-Options') == ['SAMEORIGIN']
+        assert "frame-ancestors 'self'" in response.headers['Content-Security-Policy']
+    payload = json.dumps({'grant_type': 'client_credentials', 'client_id': 'qa-client', 'client_secret': 'QaRotatedPass1!'}).encode()
+    with urlopen(Request(frontend+'/api/v1/token/', data=payload, headers={'Content-Type':'application/json'}), timeout=10) as response:
+        frontend_token = json.load(response)['access_token']
+    with urlopen(Request(frontend+'/api/v1/demographics/explorer-options/', headers={'Authorization':'Bearer '+frontend_token}), timeout=10) as response:
+        assert json.load(response)['method'] == 'calendar_year_cohort_shift_v1'
     assert launcher.main(args + ["--stop"]) == 0
     print(
-        "PASS: Docker bootstrap, token endpoint, schedule persistence, worker, restart, credential rotation and restricted runtime role."
+        "PASS: Docker bootstrap, provider workers, frontend/reverse proxy, Swagger embedding, persistence, credential rotation and restricted runtime role."
     )
     return 0
 

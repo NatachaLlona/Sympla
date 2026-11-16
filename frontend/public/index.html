@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>Demographic explorer · Census intelligence</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/styles.css">
+  <script type="module" src="/app.js"></script>
+</head>
+<body>
+  <aside class="sidebar">
+    <a class="brand" href="/" aria-label="Census intelligence home"><span class="brand-symbol" aria-hidden="true">◈</span><span>Census<span class="brand-light">intelligence</span></span></a>
+    <p class="sidebar-label">WORKSPACE</p>
+    <button class="nav-item active" id="explorer-nav"><span aria-hidden="true">▦</span> Demographic explorer</button>
+    <button class="nav-item" id="coverage-nav"><span aria-hidden="true">◎</span> Sources &amp; coverage</button>
+    <a class="nav-item" href="/docs/" target="_blank" rel="noopener"><span aria-hidden="true">↗</span> API documentation</a>
+    <div class="sidebar-bottom"><span class="source-dot"></span><div>Official IBGE data<small>Census 2022 · Brazil</small></div></div>
+  </aside>
+  <div class="workspace">
+    <header class="topbar"><div class="breadcrumb">Population intelligence <span>/</span> <strong>Explorer</strong></div><div class="account-actions"><span id="connection-status" class="connection-state">Not connected</span><button id="authorize" class="button button-dark">Authorize API <span aria-hidden="true">↗</span></button><button id="disconnect" class="button button-secondary" hidden>Disconnect</button></div></header>
+    <main>
+      <section class="page-heading"><div><div class="eyebrow">DEMOGRAPHIC EXPLORER</div><h1>Find the people behind the places.</h1><p>Explore age cohorts across the locations in your imported IBGE data.</p></div><span class="data-badge"><span class="source-dot"></span> Official census source</span></section>
+
+      <section class="time-context" aria-label="Age alignment method"><div class="time-label"><span class="context-icon" aria-hidden="true">↗</span><div><strong>Follow the census cohort forward</strong><span id="year-explanation">A calendar-year age shift, with the source kept intact.</span></div></div><div class="year-bridge"><div><small>SOURCE</small><strong id="source-year-display">2022</strong></div><span id="year-shift" class="shift-pill">+4 years →</span><div><small>ANALYSIS</small><strong id="target-year-display">2026</strong></div></div></section>
+
+      <div id="notice" class="notice" role="status" aria-live="polite">Connect through Swagger Authorize to explore your imported data. API credentials are entered only in Swagger.</div>
+
+      <div class="explorer-layout">
+        <form id="search-form" class="filters" aria-label="Demographic search filters">
+          <div class="filter-header"><h2>Build your audience</h2><button class="text-button" type="button" id="reset">Reset</button></div>
+          <fieldset><legend><span class="step">01</span> Age &amp; reference</legend>
+            <div class="input-row"><label>From age<input id="age-min" name="age_min" type="number" min="0" max="130" value="4" required></label><span class="input-separator">–</span><label>To age<input id="age-max" name="age_max" type="number" min="0" max="130" value="8" required></label></div>
+            <label>Analysis year<input id="target-year" name="target_year" type="number" min="2022" max="2026" value="2026" required></label>
+            <label>Published age band<select id="age-preset"><option value="">Custom age range</option></select></label>
+            <p class="field-help" id="age-help">Ages 0–4 in 2022 align to ages 4–8 in 2026.</p>
+          </fieldset>
+          <fieldset><legend><span class="step">02</span> Location</legend>
+            <label>IBGE integration<select id="integration" name="integration_id"><option value="">Connect to load sources</option></select></label>
+            <label>Compare<select id="level" name="level"><option value="district">Districts</option><option value="neighborhood">Neighborhoods</option><option value="city">Cities / municipalities</option><option value="state">States</option></select></label>
+            <label>State<select id="state" name="state_code"><option value="">All imported states</option></select></label>
+            <label id="city-label">City / municipality<select id="city" name="city_code"><option value="">All imported cities</option></select></label>
+            <p class="field-help">Districts and neighborhoods retain their official IBGE definitions.</p>
+          </fieldset>
+          <fieldset><legend><span class="step">03</span> Calculation</legend>
+            <label class="check-label"><input type="checkbox" id="estimate"><span>Estimate partial age bands<small>Assumes an even distribution within each closed source band.</small></span></label>
+            <label>Rank locations by<select id="sort"><option value="lower_bound">Confirmed cohort count</option><option value="upper_bound">Possible cohort upper bound</option><option value="share">Confirmed share of source population</option><option value="estimate" disabled>Proportional estimate</option></select></label>
+          </fieldset>
+          <button type="submit" class="button button-primary" id="search-button" disabled>Explore locations <span aria-hidden="true">→</span></button>
+        </form>
+
+        <section class="results-panel" aria-label="Search results">
+          <div class="metric-grid"><article class="metric"><span>Matching locations</span><strong id="metric-locations">—</strong><small>Within your selected source</small></article><article class="metric"><span>Age alignment</span><strong id="metric-shift">+4 <em>years</em></strong><small>Calendar-year cohort shift</small></article><article class="metric"><span>Calculation coverage</span><strong id="metric-coverage">—</strong><small id="metric-coverage-help">Exact, bounded or incomplete</small></article></div>
+          <section class="ranking-card">
+            <div class="ranking-heading"><div><span class="eyebrow">LOCATION COMPARISON</span><h2 id="results-title">Your next insight starts here.</h2><p id="results-subtitle">Select an age range and a geography to see the ranked results.</p></div><button type="button" class="button button-secondary" id="export" disabled>Export CSV <span aria-hidden="true">↓</span></button></div>
+            <div id="empty-state" class="empty-state"><span class="empty-mark" aria-hidden="true">▥</span><h3>A clearer picture of your audience</h3><p>Authorize the API, choose a published age band, and compare the places covered by your data.</p><span class="quiet-tag">No sample or simulated populations</span></div>
+            <div id="table-wrap" class="table-wrap" hidden><table><thead><tr><th scope="col">Rank</th><th scope="col">Location</th><th scope="col">Cohort count</th><th scope="col">Source share</th><th scope="col">Confidence in band match</th><th scope="col"><span class="sr-only">Details</span></th></tr></thead><tbody id="results-body"></tbody></table></div>
+            <div class="pagination" id="pagination" hidden><span id="page-summary"></span><div><button class="button button-secondary" type="button" id="previous">← Previous</button><button class="button button-secondary" type="button" id="next">Next →</button></div></div>
+          </section>
+          <section class="method-note"><span aria-hidden="true">ⓘ</span><div><strong>Age alignment is not a population forecast.</strong><p>These counts follow the people observed in the 2022 age tables. Births after the census, deaths and migration are not modeled. Overlapping bands show bounds unless you explicitly enable a proportional estimate.</p></div></section>
+          <section id="coverage-panel" class="coverage-card" hidden><div class="ranking-heading"><div><span class="eyebrow">SOURCE TRANSPARENCY</span><h2>Coverage &amp; reference</h2><p>Availability reported by the latest import of the selected integration.</p></div></div><div id="coverage-content" class="coverage-content"></div></section>
+        </section>
+      </div>
+      <footer>IBGE Census 2022 <span>·</span> Source observations stay unchanged <span>·</span> Counts are scoped to your API account</footer>
+    </main>
+  </div>
+  <dialog id="auth-dialog" class="auth-dialog"><div class="dialog-heading"><div><h2>Authorize through Swagger</h2><p>Use the existing Authorize button with your API client ID and secret.</p></div><button id="close-auth" class="icon-button" aria-label="Close authorization">×</button></div><iframe id="auth-frame" title="Swagger API authorization" sandbox="allow-scripts allow-same-origin allow-forms"></iframe></dialog>
+  <dialog id="detail-dialog" class="detail-dialog"><div class="dialog-heading"><div><span class="eyebrow">CALCULATION DETAILS</span><h2 id="detail-title"></h2></div><button id="close-detail" class="icon-button" aria-label="Close calculation details">×</button></div><div id="detail-content"></div></dialog>
+</body>
+</html>

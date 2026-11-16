@@ -7,6 +7,9 @@
   "api": {
     "port": 8010
   },
+  "frontend": {
+    "port": 8011
+  },
   "auth": {
     "token_ttl_seconds": 3600
   },

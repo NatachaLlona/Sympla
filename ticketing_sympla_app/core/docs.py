@@ -1,4 +1,5 @@
 import secrets
+import re
 from importlib.resources import files
 from django.conf import settings
 from django.http import FileResponse, Http404, JsonResponse
@@ -24,12 +25,17 @@ def schema(request):
 def swagger(request):
     enabled()
     nonce = secrets.token_urlsafe(24)
-    response = render(request, 'core/swagger.html', {'nonce': nonce})
+    connection = request.GET.get('frontend_connect', '')
+    embedded = bool(re.fullmatch(r'[a-f0-9]{32}', connection))
+    response = render(request, 'core/swagger.html', {'nonce': nonce, 'frontend_connection': connection if embedded else ''})
     response['Cache-Control'] = 'no-store'
     response['Referrer-Policy'] = 'no-referrer'
     response['Content-Security-Policy'] = (
         f"default-src 'none'; script-src 'self' 'nonce-{nonce}'; style-src 'self' 'unsafe-inline'; "
-        "img-src 'self' data:; connect-src 'self'; font-src 'self'; frame-ancestors 'none'; base-uri 'none'")
+        "img-src 'self' data:; connect-src 'self'; font-src 'self'; "
+        + ("frame-ancestors 'self'; " if embedded else "frame-ancestors 'none'; ") + "base-uri 'none'")
+    if embedded:
+        response['X-Frame-Options'] = 'SAMEORIGIN'
     return response
 
 
