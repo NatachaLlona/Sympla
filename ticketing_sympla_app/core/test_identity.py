@@ -389,7 +389,7 @@ class IdentityTests(TestCase):
         run.refresh_from_db()
         self.assertEqual(run.status, "cancelled")
 
-    @patch("core.services.fetch_events")
+    @patch("core.connectors.fetch_events")
     def test_provider_events_schedules_runs_and_logs_are_user_scoped(self, fetch):
         alice, _ = self.create_api_account()
         bob, _ = self.create_api_account("bob", "bob-provider-test-only")
@@ -443,7 +443,7 @@ class IdentityTests(TestCase):
             self.client.get("/api/v1/sync-runs/", **header).json()["count"], 1
         )
 
-    @patch("core.services.fetch_events")
+    @patch("core.connectors.fetch_events")
     def test_provider_rotation_during_import_prevents_stale_commit(self, fetch):
         api_account, _ = self.create_api_account()
         enqueue(api_account.client_id, owner=api_account)

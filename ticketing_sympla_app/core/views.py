@@ -18,9 +18,10 @@ from .models import (
 )
 from .scheduling import next_occurrence
 from .services import audit, enqueue
-from .sympla import configuration_error
 from .sync_errors import message
-from .provider_secrets import decrypt_token, ProviderSecretError
+from .provider_secrets import ProviderSecretError
+from .integrations import select_integration
+from .connectors import connector_for
 
 
 @require_GET
@@ -40,6 +41,7 @@ def body(request, allowed):
 def schedule_data(item):
     return {
         "id": item.id,
+        "integration_id": item.integration_id,
         "time": item.time.strftime("%H:%M"),
         "timezone": item.timezone,
         "active": item.active,
@@ -96,7 +98,8 @@ def schedules(request):
             }
         )
     try:
-        data = body(request, {"time", "timezone", "active"})
+        data = body(request, {"time", "timezone", "active", "integration_id"})
+        integration = select_integration(request.api_user, data.get('integration_id'))
         clock = data["time"]
         if not isinstance(clock, str) or not re.fullmatch(
             r"(?:[01]\d|2[0-3]):[0-5]\d", clock
@@ -120,6 +123,7 @@ def schedules(request):
             ):
                 return JsonResponse({"error": "schedule_limit"}, status=409)
             item = Schedule.objects.create(
+                integration=integration,
                 owner=request.api_user,
                 time=clock,
                 timezone=zone,
@@ -172,6 +176,8 @@ def schedule_detail(request, schedule_id):
                 raise ValueError()
         except (ValueError, KeyError, TypeError):
             return JsonResponse({"error": "invalid_active"}, status=400)
+        if data['active']:
+            select_integration(request.api_user, item.integration_id)
         item.active = data["active"]
         item.next_run_at = next_occurrence(item.time, item.timezone, timezone.now())
         action, changes = "schedule.updated", {
@@ -213,23 +219,25 @@ def schedule_detail(request, schedule_id):
 def sync_now(request):
     Coordinator.objects.select_for_update().get(pk=1)
     try:
-        body(request, set())
+        data = body(request, {'integration_id'})
     except (ValueError, TypeError):
         return JsonResponse({"error": "expected_empty_json_object"}, status=400)
+    integration = select_integration(request.api_user, data.get('integration_id'))
     try:
-        error = configuration_error(decrypt_token(request.api_user))
+        error = connector_for(integration.provider).configuration_error(integration, request.api_user)
     except ProviderSecretError:
         error = "provider_secret_unavailable"
     if error:
         return JsonResponse({"error": error, "message": message(error)}, status=503)
     if SyncRun.objects.filter(
-        owner=request.api_user, source="manual", status__in=["queued", "running"]
+        owner=request.api_user, integration=integration, source="manual", status__in=["queued", "running"]
     ).exists():
         return JsonResponse({"error": "sync_pending"}, status=409)
     run = enqueue(
         request.api_user.client_id,
         interaction=request.interaction_id,
         owner=request.api_user,
+        integration=integration,
     )
     return JsonResponse(
         {
@@ -250,6 +258,7 @@ def runs(request):
         [
             "id",
             "source",
+            "integration_id", "integration_revision", "connector_version", "collected_at",
             "actor",
             "schedule_id",
             "scheduled_for",
@@ -271,6 +280,7 @@ def run_detail(request, run_id):
         .values(
             "id",
             "source",
+            "integration_id", "integration_revision", "connector_version", "collected_at",
             "actor",
             "schedule_id",
             "scheduled_for",
@@ -293,11 +303,9 @@ def run_detail(request, run_id):
 
 @api_endpoint(["GET"], section="events")
 def events(request):
-    return page(
-        request,
-        Event.objects.filter(owner=request.api_user).order_by("id"),
-        ["id", "external_id", "version", "updated_at", "data"],
-    )
+    from .event_views import filtered_events, event_data
+    from .identity import collection
+    return collection(request, filtered_events(request), event_data)
 
 
 @api_endpoint(["GET"], section="events")

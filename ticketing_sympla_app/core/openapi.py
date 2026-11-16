@@ -445,3 +445,5 @@ PATHS["/api/v1/sync/"]["post"]["responses"]["503"] = response(
 from .identity_schema import extend
 
 extend(SCHEMA)
+from .integration_schema import extend as extend_integrations
+extend_integrations(SCHEMA)

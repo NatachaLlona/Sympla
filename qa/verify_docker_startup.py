@@ -81,7 +81,7 @@ def main():
     token = result["access_token"]
     assert result["expires_in"] == 120
     master_info = request("/me", token=token)
-    assert master_info["is_superuser"] and set(master_info["permissions"]) == {f"{section}:{action}" for section in ("identity", "roles", "authorization", "schedules", "synchronization", "events", "audit") for action in ("read", "write", "edit", "delete")}
+    assert master_info["is_superuser"] and set(master_info["permissions"]) == {f"{section}:{action}" for section in ("identity", "roles", "authorization", "integrations", "schedules", "synchronization", "events", "audit") for action in ("read", "write", "edit", "delete")}
     suffix = uuid.uuid4().hex[:8]
     role = request(
         "/roles", {"name": "QA reader " + suffix, "permissions": ["events:read"]}, token
@@ -217,6 +217,12 @@ def main():
                 "has_table_privilege(current_user, 'core_auditlog', 'TRUNCATE')"
             )
             assert cursor.fetchone() == (False, False)
+            cursor.execute(
+                "SELECT has_table_privilege(current_user, 'core_eventobservation', 'INSERT'), "
+                "has_table_privilege(current_user, 'core_eventobservation', 'UPDATE'), "
+                "has_table_privilege(current_user, 'core_eventobservation', 'DELETE')"
+            )
+            assert cursor.fetchone() == (True, False, False)
     assert launcher.main(args + ["--stop"]) == 0
     print(
         "PASS: Docker bootstrap, token endpoint, schedule persistence, worker, restart, credential rotation and restricted runtime role."

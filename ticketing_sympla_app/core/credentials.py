@@ -5,7 +5,7 @@ from .models import ApiUser
 from .services import audit
 from .password_policy import PASSWORD_RULES, valid_password
 from .rbac import ensure_catalog
-from .models import Role
+from .models import Role, Integration
 from .provider_secrets import encrypt_token
 
 
@@ -26,6 +26,7 @@ def configure_client(
         )
     if not valid_password(client_secret):
         raise ValueError("Invalid password. " + PASSWORD_RULES)
+    creating = not ApiUser.objects.filter(client_id=client_id).exists()
     api_account = (
         ApiUser.objects.select_for_update().filter(client_id=client_id).first()
     )
@@ -50,6 +51,8 @@ def configure_client(
         api_account.sympla_token_encrypted = encrypt_token(sympla_token)
         api_account.provider_version += 1
     api_account.save()
+    if creating:
+        Integration.objects.create(owner=api_account, name='Sympla', provider='sympla', is_default=True)
     audit(
         actor,
         "api_user.rotate" if rotate else "api_user.create",

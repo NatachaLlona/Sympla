@@ -12,12 +12,16 @@ from .models import (
     AuditLog,
     Coordinator,
     ApiUser,
+    Integration,
+    EventObservation,
 )
 from .scheduling import next_occurrence
-from .sympla import fetch_events, SyncError
+from .sympla import SyncError
+from .connectors import connector_for
+from .event_mapping import project
 from .sync_errors import message
 from .rbac import permitted
-from .provider_secrets import decrypt_token, ProviderSecretError
+from .provider_secrets import ProviderSecretError
 
 logger = logging.getLogger(__name__)
 
@@ -51,17 +55,25 @@ def enqueue(
     scheduled_for=None,
     interaction=None,
     owner=None,
+    integration=None,
 ):
     owner = owner or (schedule.owner if schedule else None)
     if owner is None:
         raise ValueError("An explicit owner is required for synchronization.")
     if schedule is not None and schedule.owner_id != owner.pk:
         raise ValueError("A scheduled synchronization must use its schedule owner.")
+    from .integrations import select_integration
+    integration = integration or (schedule.integration if schedule else None) or select_integration(owner)
+    if integration.owner_id != owner.pk or not integration.active or integration.deleted_at:
+        raise ValueError('An active integration belonging to the synchronization owner is required.')
+    if schedule is not None and schedule.integration_id != integration.pk:
+        raise ValueError('The synchronization must use its schedule integration.')
     run = SyncRun.objects.create(
         id=uuid.uuid4(),
         source=source,
         actor=actor,
         owner=owner,
+        integration=integration,
         schedule=schedule,
         scheduled_for=scheduled_for,
     )
@@ -83,6 +95,8 @@ def enqueue_due(now=None):
             deleted_at__isnull=True,
             owner__is_active=True,
             owner__deleted_at__isnull=True,
+            integration__active=True,
+            integration__deleted_at__isnull=True,
             next_run_at__lte=now,
         )
         .order_by("id")
@@ -116,7 +130,7 @@ def claim_run():
             if not run:
                 return None
             owner = ApiUser.objects.select_for_update().get(pk=run.owner_id)
-            if not permitted(owner, "synchronization:write"):
+            if not permitted(owner, "synchronization:write") or run.integration.owner_id != owner.pk or not run.integration.active or run.integration.deleted_at:
                 run.status, run.finished_at, run.error_code = (
                     "cancelled",
                     timezone.now(),
@@ -133,6 +147,8 @@ def claim_run():
                 )
                 return None
             run.provider_version = owner.provider_version
+            run.integration_revision = run.integration.revision
+            run.connector_version = connector_for(run.integration.provider).version
             run.status, run.running_slot, run.started_at = "running", 1, timezone.now()
             run.save(
                 update_fields=[
@@ -140,6 +156,8 @@ def claim_run():
                     "running_slot",
                     "started_at",
                     "provider_version",
+                    "integration_revision",
+                    "connector_version",
                 ]
             )
             audit(
@@ -185,62 +203,6 @@ def differences(before, after):
     return changes
 
 
-EVENT_FIELDS = {
-    "id",
-    "reference_id",
-    "name",
-    "detail",
-    "start_date",
-    "end_date",
-    "published",
-    "cancelled",
-    "private_event",
-    "url",
-    "image",
-}
-NESTED_FIELDS = {
-    "address": {
-        "name",
-        "address",
-        "address_alt",
-        "address_num",
-        "neighborhood",
-        "city",
-        "state",
-        "zip_code",
-        "country",
-        "lat",
-        "lon",
-    },
-    "host": {"name", "description"},
-    "category_prim": {"name"},
-    "category_sec": {"name"},
-}
-
-
-def normalize(payload):
-    # Persist only documented event fields; arbitrary upstream credential fields are excluded.
-    result = {key: value for key, value in payload.items() if key in EVENT_FIELDS}
-    if any(isinstance(value, (dict, list)) for value in result.values()):
-        raise SyncError("upstream_invalid_event")
-    for key, allowed in NESTED_FIELDS.items():
-        if key in payload:
-            nested = payload[key]
-            if nested is not None and not isinstance(nested, dict):
-                raise SyncError("upstream_invalid_event")
-            result[key] = (
-                None
-                if nested is None
-                else {k: v for k, v in nested.items() if k in allowed}
-            )
-            if nested and any(
-                isinstance(v, (dict, list)) for k, v in nested.items() if k in allowed
-            ):
-                raise SyncError("upstream_invalid_event")
-    result["id"] = str(result["id"])
-    return result
-
-
 @transaction.atomic
 def persist_events(run_id, payloads):
     Coordinator.objects.select_for_update().get(pk=1)
@@ -248,39 +210,56 @@ def persist_events(run_id, payloads):
     owner = ApiUser.objects.select_for_update().get(pk=run.owner_id)
     if not permitted(owner, "synchronization:write") or owner.provider_version != run.provider_version:
         raise SyncError("owner_authorization_changed")
+    integration = Integration.objects.select_for_update().get(pk=run.integration_id)
+    if integration.owner_id != owner.pk or not integration.active or integration.deleted_at or integration.revision != run.integration_revision:
+        raise SyncError('integration_changed')
+    connector = connector_for(integration.provider)
+    if connector.version != run.connector_version:
+        raise SyncError('integration_changed')
+    collected_at = timezone.now()
+    seen = set()
     counts = {"received": len(payloads), "created": 0, "updated": 0, "unchanged": 0}
     for payload in payloads:
-        data = normalize(payload)
+        data = connector.normalize(payload)
+        if data['id'] in seen:
+            raise SyncError('upstream_duplicate_event')
+        seen.add(data['id'])
         digest = hashlib.sha256(
             json.dumps(
                 data, sort_keys=True, separators=(",", ":"), allow_nan=False
             ).encode()
         ).hexdigest()
         event, created = Event.objects.get_or_create(
-            owner=owner, external_id=data["id"]
+            owner=owner, integration=integration, external_id=data["id"]
         )
+        event.first_seen_at = event.first_seen_at or collected_at
+        event.last_seen_at, event.last_run = collected_at, run
         if event.fingerprint == digest:
+            event.save(update_fields=['first_seen_at', 'last_seen_at', 'last_run'])
+            event_version = EventVersion.objects.get(event=event, version=event.version)
+            EventObservation.objects.create(event=event, event_version=event_version, run=run, collected_at=collected_at, fingerprint=digest, transformation_version=connector.version)
             counts["unchanged"] += 1
             continue
         changes = differences(event.data, data)
         event.version += 1
         event.data, event.fingerprint, event.updated_at = data, digest, timezone.now()
-        event.save()
-        EventVersion.objects.create(
+        project(event, data)
+        event_version = EventVersion.objects.create(
             event=event, version=event.version, data=data, differences=changes, run=run
         )
+        EventObservation.objects.create(event=event, event_version=event_version, run=run, collected_at=collected_at, fingerprint=digest, transformation_version=connector.version)
         audit(
             run.actor,
             "event.created" if created else "event.updated",
             "event",
-            event.external_id,
-            changes,
+            event.pk,
+            {'integration_id': str(integration.pk), 'external_id': event.external_id, 'fields': changes},
             interaction=run.pk,
             owner=owner,
         )
         counts["created" if created else "updated"] += 1
     run.status, run.running_slot = "success", None
-    run.finished_at, run.counts = timezone.now(), counts
+    run.finished_at, run.counts, run.collected_at = timezone.now(), counts, collected_at
     run.save()
     audit(
         run.actor,
@@ -300,7 +279,7 @@ def process_one():
         return None
     try:
         owner = ApiUser.objects.get(pk=run.owner_id)
-        payloads = fetch_events(token=decrypt_token(owner))
+        payloads = connector_for(run.integration.provider).collect(run.integration, owner)
         persist_events(run.pk, payloads)
     except Exception as exc:
         code = (

@@ -1,4 +1,7 @@
 MESSAGES = {
+    'unsupported_integration': 'No connector is registered for this integration provider.',
+    'integration_unavailable': 'The integration is inactive or deleted.',
+    'integration_changed': 'The integration changed during the import. No event changes were committed.',
     'owner_authorization_changed': 'The owner permission or Sympla token changed during the import. No event changes were committed.',
     'owner_not_authorized': 'The owner is inactive or no longer has write permission.',
     'provider_secret_unavailable': 'The provider token cannot be decrypted. Check the provider encryption key.',

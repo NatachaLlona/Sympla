@@ -1,7 +1,79 @@
 # Sympla Integration
 
-Daily and on-demand event synchronization with PostgreSQL persistence, change-only event versions,
-immutable history and API client authentication.
+A relational business database fed by integrations, intended to support reports and sales insights
+for people and AI systems. The first implemented domain is events, collected from Sympla through
+daily or on-demand API synchronization. File uploads, sales entities and report generation are future work.
+
+## Relational events, integration CRUD and lineage
+
+Events now have typed relational columns for their core attributes and related address, host and
+primary/secondary category records. The sanitized source snapshot remains available as `data` for
+compatibility and immutable change history. Date strings and coordinates retain source formatting;
+no timezone or precision is inferred. They are not normalized UTC instants or numeric geographic fields.
+
+```mermaid
+erDiagram
+    API_ACCOUNT ||--o{ INTEGRATION : owns
+    INTEGRATION ||--o{ SCHEDULE : schedules
+    INTEGRATION ||--o{ SYNC_RUN : imports
+    INTEGRATION ||--o{ EVENT : identifies
+    EVENT ||--o| EVENT_ADDRESS : locates
+    EVENT ||--o| EVENT_HOST : presents
+    EVENT ||--o{ EVENT_CATEGORY : classifies
+    EVENT ||--o{ EVENT_VERSION : versions
+    EVENT ||--o{ EVENT_OBSERVATION : observes
+    EVENT_VERSION ||--o{ EVENT_OBSERVATION : references
+    SYNC_RUN ||--o{ EVENT_OBSERVATION : collects
+```
+
+Integration management is owner-scoped and uses independent `integrations:read`, `integrations:write`,
+`integrations:edit` and `integrations:delete` permissions:
+
+- GET/POST `/api/v1/integrations/`
+- GET/PATCH/DELETE `/api/v1/integrations/{integration_id}/`
+- GET `/api/v1/integration-providers/`: registered connector codes and versions
+
+Example integration creation:
+
+```json
+{"name":"Event source","provider":"sympla","active":true,"is_default":false}
+```
+
+PATCH accepts name, active and is_default. Provider and owner are immutable. DELETE soft-deletes
+configuration, deactivates its schedules and cancels queued imports; existing events, versions and
+lineage remain readable. Changing a configuration during collection prevents that result from committing.
+Selecting a default does not rewrite existing schedules. Reactivating an integration preserves its
+original schedules; schedules disabled by deletion cannot be restored by undeleting the integration.
+
+Each API account receives a default Sympla integration. Sympla credentials remain encrypted and scoped
+to the API account: multiple Sympla integrations for the same API account use that account's token,
+not separate Sympla credentials. No arbitrary upstream URLs or dynamic code imports are accepted.
+Future connectors implement configuration_error, collect and normalize through the explicit registry
+in core/connectors.py; they reuse the same transactional persistence, versioning and lineage pipeline.
+Only Sympla is available in the production registry today.
+
+Schedule creation and POST `/api/v1/sync/` accept an optional integration_id. Omission selects the
+active default integration. Existing schedules remain linked to their migrated integration. Pending
+manual imports are limited per integration. Imports still require synchronization:write independently
+of integration management permissions.
+
+- GET `/api/v1/events/`: relational event fields, related records and compatible data snapshot;
+  optional integration_id and city filters.
+- GET `/api/v1/events/{event_id}/`: one event with first/last observation and latest run references.
+- GET `/api/v1/events/{event_id}/versions/`: immutable content changes.
+- GET `/api/v1/events/{event_id}/observations/`: every successful import observation, including unchanged events.
+
+Lineage links the source integration, external event ID, synchronization run, content version,
+collection time, fingerprint and transformation version. Observations are append-only in PostgreSQL,
+and runtime database permissions prohibit their modification or deletion. An import commits event
+relations, versions, observations and its success status together; any failure rolls them back together.
+The fingerprint covers the sanitized normalized event, not an unsanitized upstream HTTP response.
+
+Migration preserves event identifiers, historical versions, API credentials and existing schedules.
+Known historical versions produce observations marked evidence_type=legacy_version and
+transformation_version=legacy.snapshot.v1, using the original version-record timestamp. Those are
+reconstructed evidence, not newly verified fetch times. Previous unchanged imports cannot be reconstructed;
+new imports record them from this version onward. Missing events are not inferred to be deleted.
 
 ## Start
 
@@ -234,6 +306,7 @@ delete them without the corresponding grants. The same applies to custom roles a
 | identity | API account records, role assignment, credentials and provider token |
 | roles | Custom role creation, metadata and role permission replacement |
 | authorization | Permission catalogue and individual access grants |
+| integrations | Owned integration configurations and registered connector catalogue |
 | schedules | Daily schedules |
 | synchronization | Manual imports and synchronization runs |
 | events | Imported events and immutable versions |

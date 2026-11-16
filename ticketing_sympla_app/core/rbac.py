@@ -1,13 +1,13 @@
 from .models import Permission, Role, AccessRule
 
-SECTIONS = ("identity", "roles", "authorization", "schedules", "synchronization", "events", "audit")
+SECTIONS = ("identity", "roles", "authorization", "integrations", "schedules", "synchronization", "events", "audit")
 ACTIONS = ("read", "write", "edit", "delete")
 PERMISSIONS = {
     f"{section}:{action}": f"{action.title()} {section} records"
     for section in SECTIONS for action in ACTIONS
 }
 OPERATIONAL_PERMISSIONS = {
-    "read": [f"{section}:read" for section in ("schedules", "synchronization", "events", "audit")],
+    "read": [f"{section}:read" for section in ("integrations", "schedules", "synchronization", "events", "audit")],
     "write": ["schedules:write", "synchronization:write"],
     "edit": ["schedules:edit"],
     "delete": ["schedules:delete"],

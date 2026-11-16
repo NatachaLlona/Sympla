@@ -3,8 +3,6 @@ import signal
 from django.core.management.base import BaseCommand
 from django.db import close_old_connections
 from core.services import enqueue_due, process_one
-from core.sympla import configuration_error
-from core.sync_errors import message
 
 
 class Command(BaseCommand):
@@ -19,7 +17,7 @@ class Command(BaseCommand):
             self.stopping = True
         previous = {sig: signal.signal(sig, stop) for sig in (signal.SIGTERM, signal.SIGINT)}
         self.stdout.write('Scheduler worker started. Checking daily schedules every five seconds between imports.')
-        self.stdout.write('Every import uses its API owner\'s Sympla token and current write permission.')
+        self.stdout.write('Every import uses its registered integration connector, API account credentials and current synchronization:write permission.')
         try:
             while not self.stopping:
                 close_old_connections()
@@ -28,7 +26,7 @@ class Command(BaseCommand):
                     self.stdout.write(f'Scheduled synchronizations queued: {due}')
                 run = process_one()
                 if run:
-                    self.stdout.write(f'run_id={run.pk} owner={run.owner.identifier} source={run.source} status={run.status} '
+                    self.stdout.write(f'run_id={run.pk} owner={run.owner.identifier} integration_id={run.integration_id} source={run.source} status={run.status} '
                                       f'counts={run.counts} error_code={run.error_code or "none"}')
                 if options['once']:
                     return

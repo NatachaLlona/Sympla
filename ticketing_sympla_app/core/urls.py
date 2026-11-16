@@ -3,8 +3,14 @@ from . import views
 from . import docs
 from .token_views import token
 from . import identity
+from . import integrations, event_views
 
 urlpatterns = [
+    path('api/v1/integration-providers/', integrations.providers),
+    path('api/v1/integrations/', integrations.integrations),
+    path('api/v1/integrations/<uuid:integration_id>/', integrations.integration_detail),
+    path('api/v1/events/<int:event_id>/', event_views.event_detail),
+    path('api/v1/events/<int:event_id>/observations/', event_views.observations),
     path("me", identity.me),
     path("api/v1/me/", identity.me),
     path("api-users", identity.api_accounts),

@@ -22,6 +22,7 @@ from .models import (
     Coordinator,
 )
 from .scheduling import next_occurrence
+from .integrations import default_integration
 from .services import enqueue, enqueue_due, process_one, claim_run, persist_events
 from .sympla import fetch_events, SyncError
 from .credentials import configure_client
@@ -184,7 +185,7 @@ class ApiTests(TestCase):
         )
 
     @patch(
-        "core.services.fetch_events",
+        "core.connectors.fetch_events",
         return_value=[{"id": "integration-event", "name": "Imported"}],
     )
     def test_api_to_worker_to_history(self, fetch):
@@ -278,7 +279,7 @@ class SyncTests(TestCase):
     def queue(self):
         return enqueue("tester", owner=self.api_account)
 
-    @patch("core.services.fetch_events")
+    @patch("core.connectors.fetch_events")
     def test_versioning_and_nested_differences(self, fetch):
         fetch.return_value = [
             {
@@ -306,7 +307,7 @@ class SyncTests(TestCase):
         self.assertEqual(version.differences["/address/city"]["after"], "Porto")
         self.assertEqual(AuditLog.objects.filter(action="event.updated").count(), 1)
 
-    @patch("core.services.fetch_events")
+    @patch("core.connectors.fetch_events")
     def test_failure_rolls_back_all_events_and_logs_failure(self, fetch):
         fetch.return_value = [
             {"id": "valid", "name": "valid"},
@@ -322,9 +323,10 @@ class SyncTests(TestCase):
         self.assertTrue(AuditLog.objects.filter(action="sync.failed").exists())
         self.assertIsNone(run.running_slot)
 
-    @patch("core.services.fetch_events", side_effect=SyncError("upstream_http_error"))
+    @patch("core.connectors.fetch_events", side_effect=SyncError("upstream_http_error"))
     def test_upstream_failure_preserves_existing_events(self, fetch):
         Event.objects.create(
+            integration=default_integration(self.api_account),
             owner=self.api_account,
             external_id="existing",
             data={"id": "existing"},
@@ -343,6 +345,7 @@ class SyncTests(TestCase):
     def test_due_once_inactive_ignored_and_downtime_coalesced(self):
         now = timezone.now()
         schedule = Schedule.objects.create(
+            integration=default_integration(self.api_account),
             owner=self.api_account,
             time=time(9),
             timezone="UTC",
@@ -351,6 +354,7 @@ class SyncTests(TestCase):
             created_by="tester",
         )
         Schedule.objects.create(
+            integration=default_integration(self.api_account),
             owner=self.api_account,
             time=time(10),
             timezone="UTC",
@@ -516,6 +520,7 @@ class PostgresConcurrencyTests(TransactionTestCase):
     def test_two_schedulers_enqueue_only_one_occurrence(self):
         now = timezone.now()
         Schedule.objects.create(
+            integration=default_integration(self.api_account),
             owner=self.api_account,
             time=time(9),
             timezone="UTC",

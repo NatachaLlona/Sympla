@@ -16,6 +16,9 @@ class DocumentationTests(SimpleTestCase):
             ("/api/v1/schedules/", "post", "schedules:write"),
             ("/api/v1/sync/", "post", "synchronization:write"),
             ("/api/v1/events/", "get", "events:read"),
+            ("/api/v1/integrations/", "post", "integrations:write"),
+            ("/api/v1/integrations/{integration_id}/", "patch", "integrations:edit"),
+            ("/api/v1/events/{event_id}/observations/", "get", "events:read"),
         ]:
             self.assertEqual(paths[path][method]["x-required-permission"], permission)
         self.assertNotIn("x-required-permission", paths["/api/v1/token/"]["post"])
@@ -44,6 +47,7 @@ class DocumentationTests(SimpleTestCase):
         for path in spec["paths"]:
             actual_path = (
                 path.replace("{schedule_id}", "1")
+                .replace("{integration_id}", "00000000-0000-0000-0000-000000000001")
                 .replace("{event_id}", "1")
                 .replace("{run_id}", "00000000-0000-0000-0000-000000000001")
                 .replace("{identifier}", "00000000-0000-0000-0000-000000000001")
