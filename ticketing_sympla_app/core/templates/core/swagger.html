@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sympla API — Swagger</title>
+  <link rel="stylesheet" href="{% url 'swagger-asset' filename='swagger-ui.css' %}">
+</head>
+<body>
+  <div id="swagger-ui"></div>
+  <script src="{% url 'swagger-asset' filename='swagger-ui-bundle.js' %}"></script>
+  <script nonce="{{ nonce }}">
+    const ui = SwaggerUIBundle({
+      url: "{% url 'openapi-schema' %}",
+      dom_id: '#swagger-ui',
+      deepLinking: true,
+      persistAuthorization: false,
+      validatorUrl: null,
+      supportedSubmitMethods: ['get', 'post', 'patch', 'delete'],
+      withCredentials: false,
+      requestInterceptor: (request) => {
+        request.credentials = 'omit';
+        return request;
+      }
+    });
+    ui.initOAuth({useBasicAuthenticationWithAccessCodeGrant: false});
+  </script>
+</body>
+</html>

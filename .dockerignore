@@ -1,0 +1,10 @@
+.git
+.venv
+**/.env
+**/.env.*
+**/*.sqlite3
+**/__pycache__
+**/*.pyc
+.local
+.qa-local
+*.log

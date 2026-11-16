@@ -1,0 +1,16 @@
+{
+  // Local Docker stack. Passwords are prompted for; never put them in this file.
+  "database": {
+    "name": "Simpla",
+    "port": 2424
+  },
+  "api": {
+    "port": 8010
+  },
+  "auth": {
+    "token_ttl_seconds": 3600
+  },
+  "docker": {
+    "project_name": "sympla"
+  }
+}
