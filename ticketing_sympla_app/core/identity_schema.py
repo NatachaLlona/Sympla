@@ -1,3 +1,6 @@
+from .rbac import PERMISSIONS
+
+
 def extend(schema):
     schema["tags"] = [
         {"name": name}
@@ -17,7 +20,7 @@ def extend(schema):
     schemas, paths = schema["components"]["schemas"], schema["paths"]
     permission_list = {
         "type": "array",
-        "items": text(enum=["read", "write", "edit", "delete"]),
+        "items": text(enum=list(PERMISSIONS)),
         "uniqueItems": True,
     }
     uid = text(format="uuid")
@@ -147,7 +150,7 @@ def extend(schema):
         {
             "identifier": uid,
             "api_user_identifier": uid,
-            "permission": text(enum=["read", "write", "edit", "delete"]),
+            "permission": text(enum=list(PERMISSIONS)),
         }
     )
     schemas["AccessRuleList"] = paged("AccessRule")
@@ -155,7 +158,7 @@ def extend(schema):
         **obj(
             {
                 "api_user_identifier": uid,
-                "permission": text(enum=["read", "write", "edit", "delete"]),
+                "permission": text(enum=list(PERMISSIONS)),
             },
             ["api_user_identifier", "permission"],
         ),
@@ -169,7 +172,7 @@ def extend(schema):
             "message": text(),
         }
     )
-    admin = "Requires the protected bootstrap master. Ordinary roles cannot administer identities or authorization."
+    admin = "Requires the section:action permission documented below. Delegated API accounts can grant only permissions they possess. The bootstrap master and system roles remain protected."
     route(
         "/me",
         "get",
@@ -208,7 +211,7 @@ def extend(schema):
         "Read an API account by its unique identifier",
         "Identity",
         "ApiUser",
-        description="The master can read every identity. Ordinary identities can read only their own record.",
+        description="Requires identity:read. GET /me remains available to every authenticated API account.",
     )
     route(
         "/api/users/{identifier}",
@@ -278,7 +281,7 @@ def extend(schema):
         "Identity",
         obj({"identifier": uid, "sympla_token_configured": {"type": "boolean"}}),
         "ProviderTokenInput",
-        description="Requires edit permission for your own identity, or master authority. No other account token is used as fallback.",
+        description="Requires identity:edit. The master provider token can be changed only by the master. No other API account token is used as fallback.",
     )
     route(
         "/api-users/{identifier}/permissions",
@@ -301,11 +304,11 @@ def extend(schema):
             {
                 "results": {
                     "type": "array",
-                    "items": obj({"code": text(), "description": text()}),
+                    "items": obj({"code": text(), "section": text(), "action": text(), "description": text()}),
                 }
             }
         ),
-        description="The four permission codes are fixed. Any active authenticated identity can read this catalogue.",
+        description="Requires authorization:read. Each code combines an API section and one action: read, write, edit or delete.",
     )
     route(
         "/roles",
@@ -408,5 +411,22 @@ def extend(schema):
     schema["info"]["description"] += (
         " The startup identity is a protected master. Ordinary accounts have roles and optional individual grants. "
         "read authorizes GET, write authorizes create/sync POST, edit authorizes record PUT/PATCH, delete authorizes DELETE. "
-        "Identity/authorization administration is master-only. Provider data is scoped to the authenticated owner."
+        "Administration requires identity, roles or authorization permissions independently. Provider data is scoped to the authenticated owner."
     )
+
+    for path, methods in paths.items():
+        for method, item in methods.items():
+            if method not in ("get", "post", "put", "patch", "delete") or not item.get("security", schema.get("security")):
+                continue
+            tag = item.get("tags", [""])[0]
+            section = {"Identity": "identity", "Authorization": "authorization", "Schedules": "schedules", "Synchronization": "synchronization", "Events": "events", "Audit": "audit"}.get(tag)
+            if path.startswith("/roles"):
+                section = "roles"
+            if path == "/me" or not section:
+                continue
+            action = {"get": "read", "post": "write", "put": "edit", "patch": "edit", "delete": "delete"}[method]
+            if path.endswith("/credentials") and method == "post":
+                action = "edit"
+            code = f"{section}:{action}"
+            item["x-required-permission"] = code
+            item["description"] = f"Requires {code}. " + item.get("description", "")

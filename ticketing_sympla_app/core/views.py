@@ -68,7 +68,7 @@ def page(request, queryset, fields):
     )
 
 
-@api_endpoint(["GET", "POST"])
+@api_endpoint(["GET", "POST"], section="schedules")
 def schedules(request):
     if request.method == "GET":
         query = Schedule.objects.filter(
@@ -149,7 +149,7 @@ def schedules(request):
         )
 
 
-@api_endpoint(["DELETE", "PATCH"], write=True)
+@api_endpoint(["DELETE", "PATCH"], section="schedules")
 def schedule_detail(request, schedule_id):
     Coordinator.objects.select_for_update().get(pk=1)
     item = (
@@ -209,7 +209,7 @@ def schedule_detail(request, schedule_id):
     )
 
 
-@api_endpoint(["POST"], write=True)
+@api_endpoint(["POST"], section="synchronization")
 def sync_now(request):
     Coordinator.objects.select_for_update().get(pk=1)
     try:
@@ -242,7 +242,7 @@ def sync_now(request):
     )
 
 
-@api_endpoint(["GET"])
+@api_endpoint(["GET"], section="synchronization")
 def runs(request):
     return page(
         request,
@@ -264,7 +264,7 @@ def runs(request):
     )
 
 
-@api_endpoint(["GET"])
+@api_endpoint(["GET"], section="synchronization")
 def run_detail(request, run_id):
     run = (
         SyncRun.objects.filter(owner=request.api_user, pk=run_id)
@@ -291,7 +291,7 @@ def run_detail(request, run_id):
     return JsonResponse(run)
 
 
-@api_endpoint(["GET"])
+@api_endpoint(["GET"], section="events")
 def events(request):
     return page(
         request,
@@ -300,7 +300,7 @@ def events(request):
     )
 
 
-@api_endpoint(["GET"])
+@api_endpoint(["GET"], section="events")
 def versions(request, event_id):
     if not Event.objects.filter(owner=request.api_user, pk=event_id).exists():
         return JsonResponse({"error": "not_found"}, status=404)
@@ -313,7 +313,7 @@ def versions(request, event_id):
     )
 
 
-@api_endpoint(["GET"])
+@api_endpoint(["GET"], section="audit")
 def audit_logs(request):
     query = AuditLog.objects.order_by("-id")
     if not request.api_user.is_superuser:
@@ -338,7 +338,7 @@ def audit_logs(request):
     )
 
 
-@api_endpoint(["GET"])
+@api_endpoint(["GET"], section="audit")
 def request_logs(request):
     query = ApiRequestLog.objects.order_by("-id")
     if not request.api_user.is_superuser:

@@ -87,7 +87,7 @@ def enqueue_due(now=None):
         )
         .order_by("id")
     ):
-        if not permitted(schedule.owner, "write"):
+        if not permitted(schedule.owner, "synchronization:write"):
             continue
         enqueue(
             "scheduler",
@@ -116,7 +116,7 @@ def claim_run():
             if not run:
                 return None
             owner = ApiUser.objects.select_for_update().get(pk=run.owner_id)
-            if not permitted(owner, "write"):
+            if not permitted(owner, "synchronization:write"):
                 run.status, run.finished_at, run.error_code = (
                     "cancelled",
                     timezone.now(),
@@ -246,7 +246,7 @@ def persist_events(run_id, payloads):
     Coordinator.objects.select_for_update().get(pk=1)
     run = SyncRun.objects.select_for_update().get(pk=run_id, status="running")
     owner = ApiUser.objects.select_for_update().get(pk=run.owner_id)
-    if not permitted(owner, "write") or owner.provider_version != run.provider_version:
+    if not permitted(owner, "synchronization:write") or owner.provider_version != run.provider_version:
         raise SyncError("owner_authorization_changed")
     counts = {"received": len(payloads), "created": 0, "updated": 0, "unchanged": 0}
     for payload in payloads:

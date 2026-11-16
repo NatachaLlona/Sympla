@@ -255,7 +255,7 @@ PATHS = {
             code="201",
             body=ref("ScheduleInput"),
             example={"time": "09:30", "timezone": "Europe/Lisbon", "active": True},
-            description="Requires write permission. Confirmed means active. Maximum 100 schedules.",
+            description="Requires schedules:write. Confirmed means active. Maximum 100 schedules.",
         ),
     },
     "/api/v1/schedules/{schedule_id}/": {
@@ -267,7 +267,7 @@ PATHS = {
             parameters=[path_id("schedule_id")],
             body=ref("ScheduleState"),
             example={"active": False},
-            description="Requires write permission. Deactivation cancels queued jobs, not already running jobs.",
+            description="Requires schedules:edit. Deactivation cancels queued jobs, not already running jobs.",
         ),
         "delete": operation(
             "deleteSchedule",
@@ -276,7 +276,7 @@ PATHS = {
             None,
             code="204",
             parameters=[path_id("schedule_id")],
-            description="Requires write permission. Soft deletion preserves audit history and cancels queued jobs.",
+            description="Requires schedules:delete. Soft deletion preserves audit history and cancels queued jobs.",
         ),
     },
     "/api/v1/sync/": {
@@ -288,7 +288,7 @@ PATHS = {
             code="202",
             body={"type": "object", "additionalProperties": False},
             example={},
-            description="Requires write permission and a running worker. Queues a job without a schedule. A 202 response confirms queuing; monitor sync-runs for completion.",
+            description="Requires synchronization:write and a running worker. Queues a job without a schedule. A 202 response confirms queuing; monitor sync-runs for completion.",
         )
     },
     "/api/v1/sync-runs/": {

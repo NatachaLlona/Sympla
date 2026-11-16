@@ -15,6 +15,7 @@ from .models import (
     ApiRequestLog,
     AccessRule,
 )
+from .rbac import OPERATOR_PERMISSIONS
 from .credentials import configure_client
 from .provider_secrets import decrypt_token
 from .password_policy import valid_password
@@ -32,7 +33,7 @@ class IdentityTests(TestCase):
         self.master.save()
         self.master_header = self.header(self.master)
         self.role = Role.objects.create(name="Custom operator")
-        self.role.permissions.set(["read", "write", "edit", "delete"])
+        self.role.permissions.set(OPERATOR_PERMISSIONS + ["identity:edit"])
 
     def header(self, api_account):
         api_account.refresh_from_db()
@@ -159,11 +160,11 @@ class IdentityTests(TestCase):
         )
         self.assertEqual(self.client.get("/api-users", **header).status_code, 403)
         self.assertEqual(
-            self.client.get(f"/api-users/{bob .identifier }", **header).status_code, 404
+            self.client.get(f"/api-users/{bob .identifier }", **header).status_code, 403
         )
         self.assertEqual(
             self.request(
-                "post", "/roles", {"name": "escalate", "permissions": ["read"]}, header
+                "post", "/roles", {"name": "escalate", "permissions": ["events:read"]}, header
             ).status_code,
             403,
         )
@@ -171,14 +172,14 @@ class IdentityTests(TestCase):
             self.request(
                 "put",
                 f"/api-users/{alice .identifier }/permissions",
-                {"permissions": ["read"]},
+                {"permissions": ["events:read"]},
                 header,
             ).status_code,
             403,
         )
 
     def test_four_permissions_are_independent_and_changes_revoke_tokens(self):
-        self.role.permissions.set(["write"])
+        self.role.permissions.set(["schedules:write"])
         api_account, _ = self.create_api_account()
         header = self.header(api_account)
         created = self.request(
@@ -202,7 +203,7 @@ class IdentityTests(TestCase):
         result = self.request(
             "put",
             f"/roles/{self .role .identifier }/permissions",
-            {"permissions": ["read", "edit", "delete"]},
+            {"permissions": ["events:read", "schedules:edit", "schedules:delete"]},
         )
         self.assertEqual(result.status_code, 200)
         self.assertEqual(self.client.get("/api/v1/events/", **header).status_code, 401)
@@ -224,13 +225,75 @@ class IdentityTests(TestCase):
             self.request("post", "/api/v1/sync/", {}, header).status_code, 403
         )
 
+    def test_delegated_identity_actions_are_independent(self):
+        operator, _ = self.create_api_account("delegated")
+        target, _ = self.create_api_account("target")
+        empty = Role.objects.create(name="No permissions")
+        for action in ("write", "edit", "delete"):
+            self.role.permissions.set([f"identity:{action}"])
+            header = self.header(operator)
+            result = self.request("post", "/api-users", {
+                "client_id": f"created-{action}", "role_identifier": str(empty.identifier),
+                "sympla_token": "isolated-provider-token",
+            }, header)
+            self.assertEqual(result.status_code, 201 if action == "write" else 403)
+            result = self.request("patch", f"/api-users/{target.identifier}", {"is_active": True}, header)
+            self.assertEqual(result.status_code, 200 if action == "edit" else 403)
+            result = self.request("delete", f"/api-users/{target.identifier}", header=header)
+            self.assertEqual(result.status_code, 204 if action == "delete" else 403)
+            self.assertEqual(self.request("get", "/roles", header=header).status_code, 403)
+            self.assertEqual(self.request("get", "/api/v1/events/", header=header).status_code, 403)
+
+    def test_delegated_role_creation_and_escalation_boundary(self):
+        operator, _ = self.create_api_account("role-manager")
+        self.role.permissions.set(["roles:write", "events:read"])
+        header = self.header(operator)
+        result = self.request("post", "/roles", {"name": "Event reader", "permissions": ["events:read"]}, header)
+        self.assertEqual(result.status_code, 201)
+        role_id = result.json()["identifier"]
+        self.assertEqual(self.request("patch", f"/roles/{role_id}", {"name": "Forbidden edit"}, header).status_code, 403)
+        self.assertEqual(self.request("delete", f"/roles/{role_id}", header=header).status_code, 403)
+        self.assertEqual(self.request("post", "/roles", {"name": "Escalation", "permissions": ["identity:write"]}, header).status_code, 403)
+        self.assertFalse(Role.objects.filter(name="Escalation").exists())
+        self.role.permissions.set(["roles:edit", "events:read"])
+        header = self.header(operator)
+        self.assertEqual(self.request("put", f"/roles/{role_id}/permissions", {"permissions": ["identity:write"]}, header).status_code, 403)
+        self.assertEqual(self.request("patch", f"/roles/{role_id}", {"name": "Edited reader"}, header).status_code, 200)
+        self.role.permissions.set(["roles:delete"])
+        self.assertEqual(self.request("delete", f"/roles/{role_id}", header=self.header(operator)).status_code, 204)
+
+    def test_every_section_requires_its_own_read_permission(self):
+        operator, _ = self.create_api_account("section-reader")
+        routes = {"identity": "/api-users", "roles": "/roles", "authorization": "/permissions",
+                  "schedules": "/api/v1/schedules/", "synchronization": "/api/v1/sync-runs/",
+                  "events": "/api/v1/events/", "audit": "/api/v1/audit-logs/"}
+        for allowed in routes:
+            self.role.permissions.set([f"{allowed}:read"])
+            header = self.header(operator)
+            for section, path in routes.items():
+                with self.subTest(allowed=allowed, section=section):
+                    self.assertEqual(self.request("get", path, header=header).status_code, 200 if section == allowed else 403)
+            self.assertEqual(self.request("get", "/me", header=header).status_code, 200)
+
+    def test_token_generation_does_not_require_resource_permissions(self):
+        self.role.permissions.clear()
+        api_account, created = self.create_api_account("token-only")
+        result = self.client.post("/api/v1/token/", data=json.dumps({
+            "grant_type": "client_credentials", "client_id": api_account.client_id,
+            "client_secret": created["client_secret"],
+        }), content_type="application/json")
+        self.assertEqual(result.status_code, 200)
+        header = {"HTTP_AUTHORIZATION": "Bearer " + result.json()["access_token"]}
+        self.assertEqual(self.request("get", "/me", header=header).status_code, 200)
+        self.assertEqual(self.request("get", "/api/v1/events/", header=header).status_code, 403)
+
     def test_individual_grants_preserve_role_and_rule_crud(self):
         self.role.permissions.set([])
         api_account, _ = self.create_api_account()
         result = self.request(
             "post",
             "/access-rules",
-            {"api_user_identifier": str(api_account.identifier), "permission": "read"},
+            {"api_user_identifier": str(api_account.identifier), "permission": "events:read"},
         )
         self.assertEqual(result.status_code, 201)
         rule_id = result.json()["identifier"]
@@ -249,16 +312,16 @@ class IdentityTests(TestCase):
         result = self.request(
             "put",
             f"/api-users/{api_account .identifier }/permissions",
-            {"permissions": ["read", "write"]},
+            {"permissions": ["events:read", "schedules:write"]},
         )
         self.assertEqual(result.status_code, 200)
         api_account.refresh_from_db()
         self.assertEqual(api_account.role_id, original)
-        self.assertEqual(set(result.json()["permissions"]), {"read", "write"})
+        self.assertEqual(set(result.json()["permissions"]), {"events:read", "schedules:write"})
 
     def test_role_lifecycle_and_relationship_conflicts(self):
         result = self.request(
-            "post", "/roles", {"name": "Temporary", "permissions": ["read"]}
+            "post", "/roles", {"name": "Temporary", "permissions": ["events:read"]}
         )
         self.assertEqual(result.status_code, 201)
         role_id = result.json()["identifier"]

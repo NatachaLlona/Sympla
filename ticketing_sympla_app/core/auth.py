@@ -11,7 +11,7 @@ from .models import ApiUser, ApiRequestLog, AccessToken, Coordinator
 from .rbac import METHOD_PERMISSION, permitted
 
 
-def api_endpoint(methods, write=False, master=False, identity=False):
+def api_endpoint(methods, *, section, action=None):
     def decorate(view):
         @csrf_exempt  # Bearer-only: sessions and cookies cannot authorize API access.
         @wraps(view)
@@ -44,25 +44,22 @@ def api_endpoint(methods, write=False, master=False, identity=False):
                     response = JsonResponse({"error": "unauthorized"}, status=401)
                     response["WWW-Authenticate"] = "Bearer"
                 else:
+                    required = f"{section}:{action or METHOD_PERMISSION.get(request.method)}"
                     actor = api_account.client_id
                     owner_identifier = api_account.identifier
                     request.api_user = api_account
-                    if master and not api_account.is_superuser:
-                        response = JsonResponse({"error": "forbidden"}, status=403)
-                    elif request.method not in methods:
+                    if request.method not in methods:
                         response = JsonResponse(
                             {"error": "method_not_allowed"}, status=405
                         )
                         response["Allow"] = ", ".join(methods)
-                    elif not identity and not permitted(
-                        api_account, METHOD_PERMISSION.get(request.method, "")
+                    elif section is not None and not permitted(
+                        api_account, required
                     ):
                         response = JsonResponse(
                             {
                                 "error": "forbidden",
-                                "required_permission": METHOD_PERMISSION.get(
-                                    request.method
-                                ),
+                                "required_permission": required,
                             },
                             status=403,
                         )

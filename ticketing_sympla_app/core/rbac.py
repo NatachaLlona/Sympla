@@ -1,11 +1,18 @@
 from .models import Permission, Role, AccessRule
 
+SECTIONS = ("identity", "roles", "authorization", "schedules", "synchronization", "events", "audit")
+ACTIONS = ("read", "write", "edit", "delete")
 PERMISSIONS = {
-    "read": "Read own data",
-    "write": "Create schedules and request synchronization",
-    "edit": "Edit existing records",
-    "delete": "Delete existing records",
+    f"{section}:{action}": f"{action.title()} {section} records"
+    for section in SECTIONS for action in ACTIONS
 }
+OPERATIONAL_PERMISSIONS = {
+    "read": [f"{section}:read" for section in ("schedules", "synchronization", "events", "audit")],
+    "write": ["schedules:write", "synchronization:write"],
+    "edit": ["schedules:edit"],
+    "delete": ["schedules:delete"],
+}
+OPERATOR_PERMISSIONS = [code for codes in OPERATIONAL_PERMISSIONS.values() for code in codes]
 METHOD_PERMISSION = {
     "GET": "read",
     "POST": "write",
@@ -21,8 +28,8 @@ def ensure_catalog():
             code=code, defaults={"description": description}
         )
     for name, codes in [
-        ("reader", ["read"]),
-        ("operator", list(PERMISSIONS)),
+        ("reader", OPERATIONAL_PERMISSIONS["read"]),
+        ("operator", OPERATOR_PERMISSIONS),
         ("master", list(PERMISSIONS)),
     ]:
         role, created = Role.objects.get_or_create(

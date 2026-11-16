@@ -107,7 +107,7 @@ DJANGO_DOCS_ENABLED=false disables the documentation, schema and assets.
 ## API
 
 Except for the token endpoint, all /api/v1/ routes require an access token. Write operations require
-write permission. Lists accept page and page_size (1 to 100).
+the corresponding section:action permission. Lists accept page and page_size (1 to 100).
 
 | Method | Route | Purpose |
 | --- | --- | --- |
@@ -199,12 +199,12 @@ means there is no next page. The importer supports that response even for a sing
 
 The terminal identity is the single protected master. It cannot be demoted, disabled, deleted or have
 its credentials revoked through HTTP. Use start.py --reset-api-client for master credential changes.
-Ordinary roles never grant master authority, even with all four operational permissions.
+Ordinary roles never grant protected master status. Administration can be delegated with scoped permissions.
 
 In Swagger, first create a custom role under Authorization:
 
 ```json
-{"name":"Event operator","permissions":["read","write","edit","delete"]}
+{"name":"Schedule editor","permissions":["schedules:read","schedules:edit"]}
 ```
 
 Then POST /api-users under Identity:
@@ -223,16 +223,40 @@ Provider tokens and credential hashes are never returned by identity reads or wr
 Every new ordinary identity must supply its own Sympla token; there is no master/global fallback.
 The bootstrap master may initially omit its provider token and configure it later.
 
-| Permission | Operational behavior |
-| --- | --- |
-| read | GET own schedules, events, versions, synchronization runs and logs |
-| write | POST schedules and manual imports |
-| edit | PATCH schedules or PUT own provider token |
-| delete | DELETE schedules |
+Permissions combine an API section and an action, for example `identity:write` or `schedules:edit`.
+`read` permits GET, `write` permits creation POST, `edit` permits PUT/PATCH, and `delete` permits DELETE.
+Credential replacement POST uses `identity:edit`. Permissions are independent and additive across the
+role and individual grants. A role with `identity:write` can create API accounts; it cannot edit or
+delete them without the corresponding grants. The same applies to custom roles and schedules.
 
-Permissions are independent; write does not imply read/edit/delete. Effective access is the union of
-role permissions and individual grants. Missing grants deny access. Every active identity may read /me
-and its own public identity, even with no operational permissions. Administration is master-only.
+| Section | API resources |
+| --- | --- |
+| identity | API account records, role assignment, credentials and provider token |
+| roles | Custom role creation, metadata and role permission replacement |
+| authorization | Permission catalogue and individual access grants |
+| schedules | Daily schedules |
+| synchronization | Manual imports and synchronization runs |
+| events | Imported events and immutable versions |
+| audit | Audit and HTTP request logs |
+
+GET /permissions returns each code with its section, action and description. The catalogue contains
+four actions per section; actions without a matching endpoint do not grant additional behavior.
+Swagger documents the exact required code for every protected operation. A denied call returns 403
+and required_permission. Authentication and GET /me require no resource grant: valid active API
+credentials can always obtain their own Bearer token. GET /api-users/{identifier} requires identity:read.
+
+Delegated administrators can create roles, assign roles and grant permissions only within their own
+effective permissions. Replacing an existing role's permissions also requires authority over its
+current permissions. Reissuing credentials cannot impersonate a more privileged API account.
+The master remains protected, and system roles remain immutable.
+
+Scheduled and manual imports require synchronization:write, including the worker's final authorization
+check. Creating a schedule requires schedules:write; grant both to an API account expected to import
+on its schedules. synchronization:read permits inspecting job results independently.
+
+The migration expands old global permissions into equivalent operational permissions only. It grants
+no identity, role or authorization administration to existing ordinary API accounts. Credential IDs,
+client secrets, imported records and immutable history are preserved.
 
 Identity routes use immutable UUID identifiers:
 
@@ -247,28 +271,26 @@ Identity routes use immutable UUID identifiers:
 
 Authorization routes:
 
-- GET /permissions: fixed read/write/edit/delete catalogue
+- GET /permissions: scoped section:action catalogue (authorization:read)
 - POST/GET /roles; GET/PATCH/DELETE /roles/{identifier}
 - PUT /roles/{identifier}/permissions with {"permissions":[...]}
 - PUT /api-users/{identifier}/permissions: replace individual grants without changing the role
 - POST/GET /access-rules; DELETE /access-rules/{identifier}
 
 The reader/operator/master system roles are immutable; custom roles are editable. Referenced roles
-cannot be deleted. The master can inspect all public identities and audit/access logs. Ordinary API accounts
-can inspect only their own identity and logs. Provider-derived data and schedules are owner-scoped,
+cannot be deleted. identity:read permits inspecting public API account metadata. The master can inspect all audit/access logs; ordinary API accounts with audit:read see only their own logs. Provider-derived data and schedules are owner-scoped,
 including the master's normal operational routes. The same external event ID/time can exist for two
 API accounts without sharing data or conflicting.
 
 Role assignments, grant changes, account status changes and credential changes invalidate affected
-access tokens. Reauthorize after an approved role/grant change. Losing write permission or deactivation
+access tokens. Reauthorize after an approved role/grant change. Losing synchronization:write permission or deactivation
 cancels queued imports. Authority and the provider version are checked again before a running import
 commits; changes during an upstream fetch prevent a stale result from being saved.
 
 Provider tokens are encrypted in PostgreSQL using Fernet authenticated encryption. The key lives
 separately in .local/provider_encryption_key, mounted as a Docker secret. Back up that key with the DB;
 a replacement key cannot decrypt existing values. Startup refuses to regenerate a missing initialized
-key. Ordinary API accounts update only their own provider token and require edit permission; the master may
-update a target account's write-only provider token. Normal restarts preserve API-updated credentials.
+key. identity:edit permits updating ordinary API account provider tokens. Only the master can update its own provider token. Normal restarts preserve API-updated credentials.
 The raw master setup secret is available only to the bootstrap container, not API/worker containers.
 
 The ownership migration assigns previously global events, schedules and runs to the original master.

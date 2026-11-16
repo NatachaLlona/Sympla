@@ -1,4 +1,4 @@
-"""Master-only identity/RBAC administration; provider credentials are write-only."""
+"""Scoped identity/RBAC administration; provider credentials are write-only."""
 
 import json
 import secrets
@@ -75,6 +75,11 @@ def role_for(value):
     return role
 
 
+def delegable(request, codes):
+    if not set(codes) <= effective_permissions(request.api_user):
+        raise ApiProblem("delegation_forbidden", "API accounts can delegate only permissions they possess.", 403)
+
+
 def permission_codes(values):
     if (
         not isinstance(values, list)
@@ -83,7 +88,7 @@ def permission_codes(values):
     ):
         raise ApiProblem(
             "invalid_permissions",
-            "Permissions must be a unique list containing only read, write, edit and delete.",
+            "Permissions must be unique section:action codes from GET /permissions.",
         )
     return values
 
@@ -188,12 +193,12 @@ def new_secret():
     return "".join(chars)
 
 
-@api_endpoint(["GET"], identity=True)
+@api_endpoint(["GET"], section=None)
 def me(request):
     return JsonResponse(api_account_data(request.api_user))
 
 
-@api_endpoint(["GET", "POST"], master=True, identity=True)
+@api_endpoint(["GET", "POST"], section="identity")
 def api_accounts(request):
     if request.method == "GET":
         return collection(
@@ -207,6 +212,7 @@ def api_accounts(request):
         ["client_id", "role_identifier", "sympla_token"],
     )
     role = role_for(data["role_identifier"])
+    delegable(request, role.permissions.values_list("code", flat=True))
     secret = data["client_secret"] if "client_secret" in data else new_secret()
     try:
         api_account = configure_client(
@@ -240,17 +246,11 @@ def api_accounts(request):
     )
 
 
-@api_endpoint(["GET", "PATCH", "DELETE"], identity=True)
+@api_endpoint(["GET", "PATCH", "DELETE"], section="identity")
 def api_account_detail(request, api_user_identifier):
     api_account = target_api_account(api_user_identifier)
-    if not request.api_user.is_superuser and api_account.pk != request.api_user.pk:
-        raise ApiProblem("not_found", "API account not found.", 404)
     if request.method == "GET":
         return JsonResponse(api_account_data(api_account))
-    if not request.api_user.is_superuser:
-        raise ApiProblem(
-            "forbidden", "Master authority is required to change identity status.", 403
-        )
     ordinary(api_account)
     if request.method == "PATCH":
         data = payload(request, ["is_active"], ["is_active"])
@@ -278,19 +278,20 @@ def api_account_detail(request, api_user_identifier):
     )
 
 
-@api_endpoint(["PUT"], master=True, identity=True)
+@api_endpoint(["PUT"], section="identity")
 def assign_role(request, api_user_identifier):
     api_account = target_api_account(api_user_identifier)
     ordinary(api_account)
     data = payload(request, ["role_identifier"], ["role_identifier"])
     role = role_for(data["role_identifier"])
+    delegable(request, role.permissions.values_list("code", flat=True))
     previous = str(api_account.role.identifier) if api_account.role else None
     api_account.role, api_account.credential_version = (
         role,
         api_account.credential_version + 1,
     )
     api_account.save(update_fields=["role", "credential_version"])
-    if "write" not in effective_permissions(api_account):
+    if "synchronization:write" not in effective_permissions(api_account):
         cancel_queued(request, api_account)
     record(
         request,
@@ -303,10 +304,13 @@ def assign_role(request, api_user_identifier):
     return JsonResponse(api_account_data(api_account))
 
 
-@api_endpoint(["POST"], master=True, identity=True)
+@api_endpoint(["POST"], section="identity", action="edit")
 def issue_credentials(request, api_user_identifier):
     api_account = target_api_account(api_user_identifier)
     ordinary(api_account)
+    assigned = set(api_account.role.permissions.values_list("code", flat=True)) if api_account.role_id else set()
+    assigned.update(AccessRule.objects.filter(api_account=api_account).values_list("permission_id", flat=True))
+    delegable(request, assigned)
     payload(request, [])
     secret = new_secret()
     api_account.client_secret_hash, api_account.credential_identifier = (
@@ -339,7 +343,7 @@ def issue_credentials(request, api_user_identifier):
     )
 
 
-@api_endpoint(["DELETE"], master=True, identity=True)
+@api_endpoint(["DELETE"], section="identity")
 def revoke_credentials(request, credential_identifier):
     api_account = (
         ApiUser.objects.select_for_update()
@@ -364,11 +368,11 @@ def revoke_credentials(request, credential_identifier):
     return HttpResponse(status=204)
 
 
-@api_endpoint(["PUT"])
+@api_endpoint(["PUT"], section="identity")
 def provider_token(request, api_user_identifier):
     api_account = target_api_account(api_user_identifier)
-    if api_account.pk != request.api_user.pk and not request.api_user.is_superuser:
-        raise ApiProblem("not_found", "API account not found.", 404)
+    if api_account.is_superuser and api_account.pk != request.api_user.pk:
+        ordinary(api_account)
     data = payload(request, ["sympla_token"], ["sympla_token"])
     try:
         api_account.sympla_token_encrypted = encrypt_token(data["sympla_token"])
@@ -390,7 +394,7 @@ def provider_token(request, api_user_identifier):
     )
 
 
-@api_endpoint(["GET", "POST"], master=True, identity=True)
+@api_endpoint(["GET", "POST"], section="roles")
 def roles(request):
     if request.method == "GET":
         return collection(request, Role.objects.order_by("id"), role_data)
@@ -411,6 +415,7 @@ def roles(request):
             "Provide a printable role name (1-80 characters) and description (up to 200).",
         )
     codes = permission_codes(data["permissions"])
+    delegable(request, codes)
     role = Role.objects.create(name=name, description=description)
     role.permissions.set(codes)
     record(
@@ -434,7 +439,7 @@ def mutable_role(value):
     return role
 
 
-@api_endpoint(["GET", "PATCH", "DELETE"], master=True, identity=True)
+@api_endpoint(["GET", "PATCH", "DELETE"], section="roles")
 def role_detail(request, role_identifier):
     if request.method == "GET":
         role = Role.objects.filter(identifier=role_identifier).first()
@@ -466,13 +471,14 @@ def role_detail(request, role_identifier):
     return JsonResponse(role_data(role))
 
 
-@api_endpoint(["PUT"], master=True, identity=True)
+@api_endpoint(["PUT"], section="roles")
 def role_permissions(request, role_identifier):
     role = mutable_role(role_identifier)
     codes = permission_codes(
         payload(request, ["permissions"], ["permissions"])["permissions"]
     )
     before = sorted(role.permissions.values_list("code", flat=True))
+    delegable(request, set(before) | set(codes))
     role.permissions.set(codes)
     api_accounts = list(
         ApiUser.objects.select_for_update().filter(role=role).order_by("id")
@@ -480,7 +486,7 @@ def role_permissions(request, role_identifier):
     for api_account in api_accounts:
         api_account.credential_version += 1
         api_account.save(update_fields=["credential_version"])
-        if "write" not in effective_permissions(api_account):
+        if "synchronization:write" not in effective_permissions(api_account):
             cancel_queued(request, api_account)
     record(
         request,
@@ -492,12 +498,12 @@ def role_permissions(request, role_identifier):
     return JsonResponse(role_data(role))
 
 
-@api_endpoint(["GET"], identity=True)
+@api_endpoint(["GET"], section="authorization")
 def permissions(request):
     return JsonResponse(
         {
             "results": [
-                {"code": code, "description": description}
+                {"code": code, "section": code.split(":")[0], "action": code.split(":")[1], "description": description}
                 for code, description in PERMISSIONS.items()
             ]
         }
@@ -512,7 +518,7 @@ def rule_data(rule):
     }
 
 
-@api_endpoint(["GET", "POST"], master=True, identity=True)
+@api_endpoint(["GET", "POST"], section="authorization")
 def access_rules(request):
     if request.method == "GET":
         return collection(request, AccessRule.objects.order_by("id"), rule_data)
@@ -524,6 +530,7 @@ def access_rules(request):
     api_account = target_api_account(identifier(data["api_user_identifier"]))
     ordinary(api_account)
     permission_codes([data["permission"]])
+    delegable(request, [data["permission"]])
     rule = AccessRule.objects.create(
         api_account=api_account, permission_id=data["permission"]
     )
@@ -543,7 +550,7 @@ def access_rules(request):
     return JsonResponse(rule_data(rule), status=201)
 
 
-@api_endpoint(["DELETE"], master=True, identity=True)
+@api_endpoint(["DELETE"], section="authorization")
 def remove_rule(request, rule_identifier):
     rule = AccessRule.objects.filter(identifier=rule_identifier).first()
     if not rule:
@@ -561,18 +568,19 @@ def remove_rule(request, rule_identifier):
     rule.delete()
     api_account.credential_version += 1
     api_account.save(update_fields=["credential_version"])
-    if "write" not in effective_permissions(api_account):
+    if "synchronization:write" not in effective_permissions(api_account):
         cancel_queued(request, api_account)
     return HttpResponse(status=204)
 
 
-@api_endpoint(["PUT"], master=True, identity=True)
+@api_endpoint(["PUT"], section="authorization")
 def individual_permissions(request, api_user_identifier):
     api_account = target_api_account(api_user_identifier)
     ordinary(api_account)
     codes = permission_codes(
         payload(request, ["permissions"], ["permissions"])["permissions"]
     )
+    delegable(request, codes)
     previous = sorted(
         AccessRule.objects.filter(api_account=api_account).values_list(
             "permission_id", flat=True
@@ -584,7 +592,7 @@ def individual_permissions(request, api_user_identifier):
     )
     api_account.credential_version += 1
     api_account.save(update_fields=["credential_version"])
-    if "write" not in effective_permissions(api_account):
+    if "synchronization:write" not in effective_permissions(api_account):
         cancel_queued(request, api_account)
     record(
         request,

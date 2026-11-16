@@ -5,6 +5,21 @@ from .openapi import SCHEMA
 
 @override_settings(SECURE_SSL_REDIRECT=False, DOCS_ENABLED=True)
 class DocumentationTests(SimpleTestCase):
+    def test_schema_declares_section_permissions(self):
+        paths = self.client.get("/openapi.json").json()["paths"]
+        for path, method, permission in [
+            ("/api-users", "post", "identity:write"),
+            ("/api-users/{identifier}", "patch", "identity:edit"),
+            ("/roles", "post", "roles:write"),
+            ("/roles/{identifier}/permissions", "put", "roles:edit"),
+            ("/permissions", "get", "authorization:read"),
+            ("/api/v1/schedules/", "post", "schedules:write"),
+            ("/api/v1/sync/", "post", "synchronization:write"),
+            ("/api/v1/events/", "get", "events:read"),
+        ]:
+            self.assertEqual(paths[path][method]["x-required-permission"], permission)
+        self.assertNotIn("x-required-permission", paths["/api/v1/token/"]["post"])
+
     def test_swagger_page_and_security(self):
         result = self.client.get("/docs/")
         self.assertEqual(result.status_code, 200)

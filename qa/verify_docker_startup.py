@@ -81,15 +81,10 @@ def main():
     token = result["access_token"]
     assert result["expires_in"] == 120
     master_info = request("/me", token=token)
-    assert master_info["is_superuser"] and set(master_info["permissions"]) == {
-        "read",
-        "write",
-        "edit",
-        "delete",
-    }
+    assert master_info["is_superuser"] and set(master_info["permissions"]) == {f"{section}:{action}" for section in ("identity", "roles", "authorization", "schedules", "synchronization", "events", "audit") for action in ("read", "write", "edit", "delete")}
     suffix = uuid.uuid4().hex[:8]
     role = request(
-        "/roles", {"name": "QA reader " + suffix, "permissions": ["read"]}, token
+        "/roles", {"name": "QA reader " + suffix, "permissions": ["events:read"]}, token
     )
     child = request(
         "/api-users",
