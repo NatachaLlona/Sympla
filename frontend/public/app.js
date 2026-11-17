@@ -77,6 +77,8 @@ function updateCities() {
 }
 async function loadGeographies() {
   state.geographies = await allPages('/api/v1/geographies/', {integration_id: $('integration').value});
+  const imported = state.options.integrations.find(row => row.id === $('integration').value)?.levels || [];
+  if (imported.length && !imported.includes($('level').value)) $('level').value = imported.includes('city') ? 'city' : imported[0];
   setOptions('state', state.geographies.filter(row => row.level === 'state').map(row => ({id: row.code, name: row.name})), 'All imported states'); updateCities();
 }
 async function loadWorkspace() {
@@ -242,11 +244,13 @@ $('estimate').addEventListener('change', () => {
   $('sort').querySelector('option[value="estimate"]').disabled = !$('estimate').checked;
   if ($('estimate').checked) $('sort').value = 'estimate'; else if ($('sort').value === 'estimate') $('sort').value = 'lower_bound';
 });
-$('integration').addEventListener('change', async () => { try { resetResults(); await loadGeographies(); notice('Source changed. Apply the search to explore this integration.'); } catch (error) { notice(error.message, 'error'); } });
+$('integration').addEventListener('change', async () => { try { resetResults(); $('coverage-panel').hidden = true; $('coverage-content').replaceChildren(); $('state').value = ''; $('city').value = ''; await loadGeographies(); notice('Source changed. Apply the search to explore this integration.'); } catch (error) { notice(error.message, 'error'); } });
 $('reset').addEventListener('click', () => {
   $('target-year').value = state.options?.current_year || yearNow;
   const delta = Number($('target-year').value) - (state.options?.source_years[0] || 2022);
   $('age-min').value = delta; $('age-max').value = delta + 4; $('level').value = 'district'; $('estimate').checked = false; $('sort').value = 'lower_bound';
+  const imported = state.options?.integrations.find(row => row.id === $('integration').value)?.levels || [];
+  if (imported.length && !imported.includes('district')) $('level').value = imported.includes('city') ? 'city' : imported[0];
   $('sort').querySelector('option[value="estimate"]').disabled = true; syncYears(); presets(); updateCities();
 });
 $('target-year').max = $('target-year').value = yearNow; $('age-min').value = yearNow - 2022; $('age-max').value = yearNow - 2022 + 4; syncYears(); presets();

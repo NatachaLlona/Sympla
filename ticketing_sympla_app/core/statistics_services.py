@@ -51,7 +51,7 @@ def persist_statistics(run_id, batch):
     collected_at = timezone.now()
     sources = {}
     for item in batch['sources']:
-        sources[item['code']] = ImportSource.objects.create(run=run, code=item['code'], url=item['url'], sha256=item['sha256'], reference_period='2022', collected_at=collected_at)
+        sources[item['code']] = ImportSource.objects.create(run=run, code=item['code'], url=item['url'], sha256=item['sha256'], reference_period=item.get('reference_period', '2022'), collected_at=collected_at)
     locations, seen = {}, set()
     categories = {(row.indicator_id, row.code): row for row in StatisticalCategory.objects.select_related('indicator')}
     counts = {'received': len(batch['records']), 'created': 0, 'updated': 0, 'unchanged': 0, 'missing': 0}

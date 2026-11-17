@@ -31,7 +31,7 @@ def extend(schema):
     search['x-required-permission'] = 'demographics:read'
     paths['/api/v1/demographics/search/'] = {'get': search}
     options = operation('getDemographicExplorerOptions', 'Read available cohort sources and age bands', 'Demographics',
-        obj({'current_year': integer(), 'source_years': {'type': 'array', 'items': integer()}, 'integrations': {'type': 'array', 'items': obj({'id': text(format='uuid'), 'name': text()})},
+        obj({'current_year': integer(), 'source_years': {'type': 'array', 'items': integer()}, 'integrations': {'type': 'array', 'items': obj({'id': text(format='uuid'), 'name': text(), 'levels': {'type': 'array', 'items': text(enum=['state', 'city', 'neighborhood', 'district'])}})},
              'source_bands': {'type': 'array', 'items': obj({'code': text(), 'name': text(), 'age_min': integer(), 'age_max': integer(nullable=True)})},
              'method': text(), 'limitations': {'type': 'array', 'items': text()}}), description='Requires demographics:read. Returns only sources with imported age statistics owned by the API account.')
     options['x-required-permission'] = 'demographics:read'

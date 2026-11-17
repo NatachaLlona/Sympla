@@ -132,9 +132,12 @@ def align_cohort(rows, source_year, target_year, age_min, age_max, estimate=Fals
 def options(request):
     query = available_statistics(request.api_user)
     integrations = list(query.values('integration_id', 'integration__name').distinct().order_by('integration__name', 'integration_id'))
+    imported_levels = defaultdict(set)
+    for integration_id, level in query.values_list('integration_id', 'geography__level').distinct():
+        imported_levels[integration_id].add(level)
     source_years = sorted({int(value) for value in query.values_list('period', flat=True).distinct() if value.isascii() and value.isdigit()})
     return JsonResponse({'current_year': current_year(), 'source_years': source_years, 'integrations': [
-        {'id': row['integration_id'], 'name': row['integration__name']} for row in integrations],
+        {'id': row['integration_id'], 'name': row['integration__name'], 'levels': sorted(imported_levels[row['integration_id']])} for row in integrations],
         'source_bands': [{'code': code, 'name': name, 'age_min': minimum, 'age_max': maximum} for code, name, minimum, maximum, _ in AGE_BANDS],
         'method': METHOD, 'limitations': LIMITATIONS})
 

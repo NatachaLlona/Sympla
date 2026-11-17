@@ -1,6 +1,7 @@
 """Prepare the named disposable frontend QA stack using official public IBGE data."""
 import importlib.util
 import json
+import subprocess
 from pathlib import Path
 import time
 from urllib.request import Request, urlopen
@@ -49,6 +50,19 @@ def main():
     result = request('/api/v1/demographics/search/?integration_id='+integration['id']+'&age_min=4&age_max=8&level=district', token=token)
     assert result['count'] == 96
     print('PASS: disposable frontend QA stack has official age data for 96 São Paulo districts.', flush=True)
+    subprocess.run(['docker', 'exec', 'sympla-startup-qa-api-1', 'python', 'manage.py',
+                    'configure_ibge_capitals', '--client-id', 'qa-client'], check=True)
+    national = next(row for row in request('/api/v1/integrations/', token=token)['results']
+                    if row['configuration'].get('geographic_preset') == 'capital_metropolitan_areas_2025')
+    deadline = time.monotonic()+300
+    while time.monotonic() < deadline:
+        runs = request('/api/v1/sync-runs/?integration_id='+national['id'], token=token)
+        if not any(row['status'] in ('queued', 'running') for row in runs['results']):
+            break
+        time.sleep(2)
+    result = request('/api/v1/demographics/search/?integration_id='+national['id']+'&age_min=4&age_max=8&level=city', token=token)
+    assert result['count'] == 430
+    print('PASS: national frontend QA scope has 430 municipalities.', flush=True)
 
 
 if __name__ == '__main__':

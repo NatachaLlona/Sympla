@@ -1,5 +1,51 @@
 # Modular IBGE integration
 
+## Capitals and metropolitan municipalities
+
+The preset `capital_metropolitan_areas_2025` imports **430 unique municipalities**: all 26 state
+capitals, Brasília, and members of the same official metropolitan category or RIDE as each capital.
+It uses [IBGE composition 2025, corrected 2026-07-29](https://geoftp.ibge.gov.br/organizacao_do_territorio/estrutura_territorial/municipios_por_regioes_metropolitanas/Situacao_2020a2029/Composicao_RM_2025.xlsx).
+The geographical composition date is distinct from the demographic reference period, Census 2022.
+
+Create an owned integration with `POST /api/v1/integrations/`:
+
+```json
+{
+  "name": "IBGE - Capitals and metropolitan areas",
+  "provider": "ibge",
+  "configuration": {
+    "geographic_preset": "capital_metropolitan_areas_2025",
+    "levels": ["city"]
+  }
+}
+```
+
+Submit its identifier to `POST /api/v1/sync/`, or use it in a daily schedule. Operators can also run:
+
+```text
+docker exec sympla-api-1 python manage.py configure_ibge_capitals --client-id YOUR_CLIENT_ID
+```
+
+Repeated calls reuse the integration and any pending run. Existing integrations, credentials and
+schedules are preserved. The API account needs `integrations:write` and `synchronization:write`.
+The preset imports municipal population, age and income; it does not request every neighborhood or
+infer metropolitan income by averaging municipal means. Select the national source in the frontend;
+it defaults to comparing cities/municipalities. The detailed São Paulo source remains separate.
+
+Membership follows `COD_CATMETROPOL` containing the capital, not distance. Florianópolis includes its
+official expansion subcategory. Belo Horizonte's separate metropolitan collar is excluded. Brasília
+and Teresina retain their RIDE classification. Rio Branco and Campo Grande have no matching membership
+in this edition and are imported individually. Campinas belongs to a separate RM and is not included
+through São Paulo. Municipalities are deduplicated by official code.
+
+The bundled JSON retains capital memberships, source URL and SHA-256. Reproduce it from the official
+workbook saved as `.qa-local/metro-2025.xlsx` with `python qa/build_metropolitan_catalog.py`. A later
+geographical edition requires a reviewed catalog update. Each import preserves the composition source
+with reference year 2025 separately from the demographic source files with reference year 2022.
+Coverage records retain per-capital descriptions. Validation: 107 tests passed on PostgreSQL.
+
+## Provider architecture
+
 The `integration-sympla` and `integration-ibge` Docker services have independent images, processes,
 provider-filtered queues and worker health checks. Both persist through the same relational PostgreSQL
 database. The API provides authentication, integration CRUD, schedules and read endpoints. IBGE needs

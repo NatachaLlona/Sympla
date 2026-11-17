@@ -3,24 +3,30 @@ import re
 from decimal import Decimal, InvalidOperation
 from .catalog import archive, AGE_BANDS
 from .http import download, csv_rows, json_document
+from .metropolitan import PRESET, catalog as metropolitan_catalog, municipality_codes
 from ...sync_exception import SyncError
 
 
 def configuration(value):
-    if not isinstance(value, dict) or value.keys() - {'state_codes', 'municipality_codes', 'levels', 'include_districts_when_no_neighborhoods'}:
+    if not isinstance(value, dict) or value.keys() - {'state_codes', 'municipality_codes', 'levels', 'include_districts_when_no_neighborhoods', 'geographic_preset'}:
         raise ValueError('Provide documented IBGE scope fields only.')
     result = dict(value)
+    preset = result.get('geographic_preset')
+    if 'geographic_preset' in result and preset != PRESET:
+        raise ValueError(f'geographic_preset must be {PRESET}.')
     for field, pattern, limit in [('state_codes', r'\d{2}', 27), ('municipality_codes', r'\d{7}', 10)]:
         codes = result.get(field, [])
         if not isinstance(codes, list) or len(codes) > limit or any(not isinstance(code, str) or not re.fullmatch(pattern, code) for code in codes) or len(set(codes)) != len(codes):
             raise ValueError(f'{field} must contain unique official IBGE codes (maximum {limit}).')
         result[field] = sorted(codes)
-    levels = result.get('levels', ['state', 'city', 'neighborhood'])
+    levels = result.get('levels', ['city'] if preset else ['state', 'city', 'neighborhood'])
     if not isinstance(levels, list) or not levels or any(level not in ('state', 'city', 'neighborhood') for level in levels) or len(set(levels)) != len(levels):
         raise ValueError('levels must contain unique state, city or neighborhood values.')
-    if not result['state_codes'] and not result['municipality_codes']:
+    if preset and (result['state_codes'] or result['municipality_codes'] or levels != ['city']):
+        raise ValueError('The capital metropolitan preset uses city level only and cannot be combined with explicit codes.')
+    if not preset and not result['state_codes'] and not result['municipality_codes']:
         raise ValueError('Choose at least one state or municipality code.')
-    if any(level in levels for level in ('city', 'neighborhood')) and not result['municipality_codes']:
+    if not preset and any(level in levels for level in ('city', 'neighborhood')) and not result['municipality_codes']:
         raise ValueError('Choose municipality_codes for city or neighborhood imports.')
     result['levels'] = levels
     fallback = result.get('include_districts_when_no_neighborhoods', True)
@@ -46,7 +52,7 @@ def number(value):
 
 class IbgeConnector:
     code = 'ibge'
-    version = 'ibge.census2022.v1'
+    version = 'ibge.census2022.v2'
     credential_scope = 'public'
     domain = 'statistics'
     running_slot = 2
@@ -62,8 +68,20 @@ class IbgeConnector:
     def collect(self, integration, api_account):
         scope = configuration(integration.configuration)
         municipalities = set(scope['municipality_codes'])
+        if scope.get('geographic_preset') == PRESET:
+            municipalities = municipality_codes()
         states = set(scope['state_codes']) | {code[:2] for code in municipalities}
         result = {'records': [], 'sources': [], 'coverage': []}
+        if scope.get('geographic_preset') == PRESET:
+            catalog = metropolitan_catalog()
+            result['sources'].append({'code': 'metropolitan_composition_2025', 'url': catalog['source_url'],
+                'sha256': catalog['source_sha256'], 'reference_period': str(catalog['composition_year'])})
+            for capital in catalog['capitals']:
+                areas = capital['areas']
+                count = len({code for area in areas for code in area['members']} or {capital['code']})
+                description = '; '.join(area['name'] for area in areas) if areas else 'No official metropolitan or RIDE membership in this edition; capital imported individually.'
+                result['coverage'].append({'level': 'city', 'parent_code': capital['code'], 'status': 'available',
+                    'record_count': count, 'message': f"{capital['name']} ({capital['state']}): {description} Composition 2025, corrected 2026-07-29. Demographic reference remains 2022."})
         cache = {}
 
         def source(level, topic):

@@ -73,6 +73,12 @@ estimate, coverage flags and method; spreadsheet formula prefixes in text are ne
 
 ## API
 
+The national source `IBGE - Capitals and metropolitan areas` contains 430 municipalities covering
+all 27 capitals and the official metropolitan regions/RIDEs containing them. Select that source to
+compare cities and filter by state. Source changes clear the previous locality filter and automatically
+choose an imported comparison level. The detailed São Paulo source remains separate. See the
+[scope, official composition and import instructions](ibge-integration.md#capitals-and-metropolitan-municipalities).
+
 - GET `/api/v1/demographics/explorer-options/`: available imported sources, source years and age bands.
 - GET `/api/v1/demographics/search/`: validated, ranked and paginated cohort comparisons.
 - GET `/api/v1/geographies/?integration_id=UUID`: source-scoped geography metadata.

@@ -6,6 +6,7 @@ def extend(schema):
     config = obj({
         'state_codes': {'type': 'array', 'items': text(pattern=r'^\d{2}$'), 'maxItems': 27},
         'municipality_codes': {'type': 'array', 'items': text(pattern=r'^\d{7}$'), 'maxItems': 10},
+        'geographic_preset': text(enum=['capital_metropolitan_areas_2025'], description='All 27 capitals and members of their official metropolitan regions or RIDEs in corrected IBGE composition 2025. Use levels=[city] without explicit state or municipality codes.'),
         'levels': {'type': 'array', 'items': text(enum=['state', 'city', 'neighborhood'])},
         'include_districts_when_no_neighborhoods': {'type': 'boolean', 'default': True},
     })

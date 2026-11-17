@@ -2,6 +2,11 @@
 
 ## Demographic frontend
 
+National scope added: 430 municipalities covering the 27 capitals and their official metropolitan
+regions/RIDEs, based on corrected IBGE composition 2025. Municipal demographic measurements retain
+reference year 2022. The local import created 6,450 observations without missing values, while retaining
+coverage warnings where official age and basic population totals differ. Validation: 107 PostgreSQL tests.
+
 The `frontend` container provides a read-only demographic explorer, source lineage and CSV export.
 It uses the existing API and `demographics:read` permission; provider integrations remain independent.
 Calendar-year cohort alignment advances the published age bands without overwriting census values

@@ -1,0 +1,2960 @@
+{
+  "preset": "capital_metropolitan_areas_2025",
+  "composition_year": 2025,
+  "source_updated": "2026-07-29",
+  "source_url": "https://geoftp.ibge.gov.br/organizacao_do_territorio/estrutura_territorial/municipios_por_regioes_metropolitanas/Situacao_2020a2029/Composicao_RM_2025.xlsx",
+  "source_sha256": "8034d21968556bc2c8a0ae600ead000aad501bde3ae1eed4ef84b78e726e07d2",
+  "capitals": [
+    {
+      "code": "1100205",
+      "name": "PORTO VELHO",
+      "state": "RO",
+      "areas": [
+        {
+          "code": "00101",
+          "name": "Região Metropolitana de Porto Velho",
+          "members": [
+            "1100205",
+            "1100809"
+          ],
+          "subcategories": []
+        }
+      ]
+    },
+    {
+      "code": "1200401",
+      "name": "Rio Branco",
+      "state": "AC",
+      "areas": []
+    },
+    {
+      "code": "1302603",
+      "name": "MANAUS",
+      "state": "AM",
+      "areas": [
+        {
+          "code": "00201",
+          "name": "Região Metropolitana de Manaus",
+          "members": [
+            "1300300",
+            "1301100",
+            "1301159",
+            "1301852",
+            "1301902",
+            "1302009",
+            "1302504",
+            "1302553",
+            "1302603",
+            "1303205",
+            "1303536",
+            "1303569",
+            "1304005"
+          ],
+          "subcategories": []
+        }
+      ]
+    },
+    {
+      "code": "1400100",
+      "name": "BOA VISTA",
+      "state": "RR",
+      "areas": [
+        {
+          "code": "00301",
+          "name": "Região Metropolitana da Capital",
+          "members": [
+            "1400050",
+            "1400100",
+            "1400159",
+            "1400175",
+            "1400308"
+          ],
+          "subcategories": []
+        }
+      ]
+    },
+    {
+      "code": "1501402",
+      "name": "BELÉM",
+      "state": "PA",
+      "areas": [
+        {
+          "code": "00601",
+          "name": "Região Metropolitana de Belém",
+          "members": [
+            "1500800",
+            "1501303",
+            "1501402",
+            "1501501",
+            "1502400",
+            "1504422",
+            "1506351",
+            "1506500"
+          ],
+          "subcategories": []
+        }
+      ]
+    },
+    {
+      "code": "1600303",
+      "name": "MACAPÁ",
+      "state": "AP",
+      "areas": [
+        {
+          "code": "00801",
+          "name": "Região Metropolitana de Macapá",
+          "members": [
+            "1600303",
+            "1600402",
+            "1600600"
+          ],
+          "subcategories": []
+        }
+      ]
+    },
+    {
+      "code": "1721000",
+      "name": "PALMAS",
+      "state": "TO",
+      "areas": [
+        {
+          "code": "00901",
+          "name": "Região Metropolitana de Palmas",
+          "members": [
+            "1701101",
+            "1703107",
+            "1703701",
+            "1704600",
+            "1706100",
+            "1707108",
+            "1707553",
+            "1709807",
+            "1711902",
+            "1711951",
+            "1712009",
+            "1712405",
+            "1712702",
+            "1713205",
+            "1713304",
+            "1713601",
+            "1713700",
+            "1715002",
+            "1715101",
+            "1715507",
+            "1716109",
+            "1717909",
+            "1718204",
+            "1718451",
+            "1718709",
+            "1718758",
+            "1719004",
+            "1720150",
+            "1720655",
+            "1721000",
+            "1721109"
+          ],
+          "subcategories": []
+        }
+      ]
+    },
+    {
+      "code": "2111300",
+      "name": "SÃO LUÍS",
+      "state": "MA",
+      "areas": [
+        {
+          "code": "01101",
+          "name": "Região Metropolitana da Grande São Luís",
+          "members": [
+            "2100204",
+            "2101103",
+            "2101251",
+            "2102374",
+            "2105104",
+            "2107100",
+            "2107506",
+            "2109205",
+            "2109452",
+            "2109601",
+            "2110203",
+            "2111201",
+            "2111300"
+          ],
+          "subcategories": []
+        }
+      ]
+    },
+    {
+      "code": "2211001",
+      "name": "TERESINA",
+      "state": "PI",
+      "areas": [
+        {
+          "code": "01301",
+          "name": "Região Integrada de Desenvolvimento da Grande Teresina",
+          "members": [
+            "2112209",
+            "2200400",
+            "2201606",
+            "2202737",
+            "2203255",
+            "2203305",
+            "2205508",
+            "2205557",
+            "2205581",
+            "2206308",
+            "2206407",
+            "2206720",
+            "2211001",
+            "2211100"
+          ],
+          "subcategories": []
+        }
+      ]
+    },
+    {
+      "code": "2304400",
+      "name": "FORTALEZA",
+      "state": "CE",
+      "areas": [
+        {
+          "code": "01401",
+          "name": "Região Metropolitana de Fortaleza",
+          "members": [
+            "2301000",
+            "2303501",
+            "2303709",
+            "2303956",
+            "2304285",
+            "2304400",
+            "2304954",
+            "2305233",
+            "2306256",
+            "2307650",
+            "2307700",
+            "2309607",
+            "2309706",
+            "2310209",
+            "2310258",
+            "2310852",
+            "2312403",
+            "2312601",
+            "2313500"
+          ],
+          "subcategories": []
+        }
+      ]
+    },
+    {
+      "code": "2408102",
+      "name": "NATAL",
+      "state": "RN",
+      "areas": [
+        {
+          "code": "01701",
+          "name": "Região Metropolitana de Natal",
+          "members": [
+            "2401206",
+            "2401701",
+            "2402600",
+            "2403251",
+            "2403608",
+            "2404200",
+            "2404606",
+            "2407104",
+            "2407500",
+            "2407807",
+            "2408102",
+            "2408201",
+            "2412005",
+            "2412203",
+            "2414803"
+          ],
+          "subcategories": []
+        }
+      ]
+    },
+    {
+      "code": "2507507",
+      "name": "JOÃO PESSOA",
+      "state": "PB",
+      "areas": [
+        {
+          "code": "01801",
+          "name": "Região Metropolitana de João Pessoa",
+          "members": [
+            "2500601",
+            "2501807",
+            "2503001",
+            "2503209",
+            "2504603",
+            "2504900",
+            "2507507",
+            "2508604",
+            "2511202",
+            "2511905",
+            "2512903",
+            "2513703"
+          ],
+          "subcategories": []
+        }
+      ]
+    },
+    {
+      "code": "2611606",
+      "name": "RECIFE",
+      "state": "PE",
+      "areas": [
+        {
+          "code": "03001",
+          "name": "Região Metropolitana de Recife",
+          "members": [
+            "2600054",
+            "2601052",
+            "2602902",
+            "2603454",
+            "2606804",
+            "2607208",
+            "2607604",
+            "2607752",
+            "2607901",
+            "2609402",
+            "2609600",
+            "2610707",
+            "2611606",
+            "2613701"
+          ],
+          "subcategories": []
+        }
+      ]
+    },
+    {
+      "code": "2704302",
+      "name": "MACEIÓ",
+      "state": "AL",
+      "areas": [
+        {
+          "code": "03201",
+          "name": "Região Metropolitana de Maceió",
+          "members": [
+            "2700409",
+            "2700508",
+            "2700607",
+            "2702207",
+            "2704302",
+            "2704708",
+            "2705200",
+            "2705507",
+            "2706448",
+            "2706901",
+            "2707701",
+            "2707909",
+            "2708907"
+          ],
+          "subcategories": []
+        }
+      ]
+    },
+    {
+      "code": "2800308",
+      "name": "ARACAJU",
+      "state": "SE",
+      "areas": [
+        {
+          "code": "04101",
+          "name": "Região Metropolitana de Aracaju",
+          "members": [
+            "2800308",
+            "2800605",
+            "2804805",
+            "2806701"
+          ],
+          "subcategories": []
+        }
+      ]
+    },
+    {
+      "code": "2927408",
+      "name": "SALVADOR",
+      "state": "BA",
+      "areas": [
+        {
+          "code": "04201",
+          "name": "Região Metropolitana de Salvador",
+          "members": [
+            "2905701",
+            "2906501",
+            "2910057",
+            "2916104",
+            "2919207",
+            "2919926",
+            "2921005",
+            "2925204",
+            "2927408",
+            "2929206",
+            "2929503",
+            "2930709",
+            "2933208"
+          ],
+          "subcategories": []
+        }
+      ]
+    },
+    {
+      "code": "3106200",
+      "name": "BELO HORIZONTE",
+      "state": "MG",
+      "areas": [
+        {
+          "code": "04501",
+          "name": "Região Metropolitana de Belo Horizonte",
+          "members": [
+            "3105004",
+            "3106200",
+            "3106705",
+            "3109006",
+            "3110004",
+            "3112505",
+            "3117876",
+            "3118601",
+            "3124104",
+            "3126000",
+            "3129806",
+            "3130101",
+            "3132206",
+            "3133709",
+            "3134608",
+            "3136603",
+            "3136652",
+            "3137601",
+            "3140159",
+            "3140704",
+            "3141108",
+            "3144805",
+            "3149309",
+            "3153905",
+            "3154606",
+            "3154804",
+            "3155306",
+            "3156700",
+            "3157807",
+            "3162922",
+            "3162955",
+            "3165537",
+            "3168309",
+            "3171204"
+          ],
+          "subcategories": []
+        }
+      ]
+    },
+    {
+      "code": "3205309",
+      "name": "VITÓRIA",
+      "state": "ES",
+      "areas": [
+        {
+          "code": "04701",
+          "name": "Região Metropolitana da Grande Vitória",
+          "members": [
+            "3201308",
+            "3202207",
+            "3202405",
+            "3205002",
+            "3205101",
+            "3205200",
+            "3205309"
+          ],
+          "subcategories": []
+        }
+      ]
+    },
+    {
+      "code": "3304557",
+      "name": "RIO DE JANEIRO",
+      "state": "RJ",
+      "areas": [
+        {
+          "code": "04801",
+          "name": "Região Metropolitana do Rio de Janeiro",
+          "members": [
+            "3300456",
+            "3300803",
+            "3301702",
+            "3301850",
+            "3301900",
+            "3302007",
+            "3302270",
+            "3302502",
+            "3302700",
+            "3302858",
+            "3303203",
+            "3303302",
+            "3303500",
+            "3303609",
+            "3303906",
+            "3304144",
+            "3304300",
+            "3304557",
+            "3304904",
+            "3305109",
+            "3305554",
+            "3305752"
+          ],
+          "subcategories": []
+        }
+      ]
+    },
+    {
+      "code": "3550308",
+      "name": "SÃO PAULO",
+      "state": "SP",
+      "areas": [
+        {
+          "code": "04901",
+          "name": "Região Metropolitana de São Paulo",
+          "members": [
+            "3503901",
+            "3505708",
+            "3506607",
+            "3509007",
+            "3509205",
+            "3510609",
+            "3513009",
+            "3513801",
+            "3515004",
+            "3515103",
+            "3515707",
+            "3516309",
+            "3516408",
+            "3518305",
+            "3518800",
+            "3522208",
+            "3522505",
+            "3523107",
+            "3525003",
+            "3526209",
+            "3528502",
+            "3529401",
+            "3530607",
+            "3534401",
+            "3539103",
+            "3539806",
+            "3543303",
+            "3544103",
+            "3545001",
+            "3546801",
+            "3547304",
+            "3547809",
+            "3548708",
+            "3548807",
+            "3549953",
+            "3550308",
+            "3552502",
+            "3552809",
+            "3556453"
+          ],
+          "subcategories": [
+            "Sub-região Leste",
+            "Sub-região Norte",
+            "Sub-região Oeste",
+            "Sub-região Sudeste",
+            "Sub-região Sudoeste"
+          ]
+        }
+      ]
+    },
+    {
+      "code": "4106902",
+      "name": "CURITIBA",
+      "state": "PR",
+      "areas": [
+        {
+          "code": "05501",
+          "name": "Região Metropolitana de Curitiba",
+          "members": [
+            "4100202",
+            "4100301",
+            "4100400",
+            "4101804",
+            "4102307",
+            "4103107",
+            "4104006",
+            "4104105",
+            "4104204",
+            "4104253",
+            "4105201",
+            "4105805",
+            "4106209",
+            "4106902",
+            "4107652",
+            "4111258",
+            "4113205",
+            "4114302",
+            "4119103",
+            "4119152",
+            "4119509",
+            "4120804",
+            "4121208",
+            "4122206",
+            "4122305",
+            "4125506",
+            "4127601",
+            "4127882",
+            "4128633"
+          ],
+          "subcategories": []
+        }
+      ]
+    },
+    {
+      "code": "4205407",
+      "name": "FLORIANÓPOLIS",
+      "state": "SC",
+      "areas": [
+        {
+          "code": "06301",
+          "name": "Região Metropolitana de Florianópolis",
+          "members": [
+            "4200606",
+            "4200705",
+            "4200903",
+            "4201109",
+            "4201208",
+            "4202305",
+            "4203709",
+            "4205407",
+            "4205704",
+            "4206009",
+            "4209805",
+            "4210209",
+            "4211504",
+            "4211900",
+            "4212304",
+            "4214300",
+            "4215703",
+            "4215901",
+            "4216305",
+            "4216602",
+            "4217253",
+            "4218004"
+          ],
+          "subcategories": [
+            "Núcleo Metropolitano",
+            "Área de Expansão Metropolitana"
+          ]
+        }
+      ]
+    },
+    {
+      "code": "4314902",
+      "name": "PORTO ALEGRE",
+      "state": "RS",
+      "areas": [
+        {
+          "code": "07401",
+          "name": "Região Metropolitana de Porto Alegre",
+          "members": [
+            "4300604",
+            "4300877",
+            "4301107",
+            "4303103",
+            "4303905",
+            "4304606",
+            "4304689",
+            "4305355",
+            "4306403",
+            "4306767",
+            "4307609",
+            "4307708",
+            "4309050",
+            "4309209",
+            "4309308",
+            "4310108",
+            "4310801",
+            "4312401",
+            "4313060",
+            "4313375",
+            "4313409",
+            "4314050",
+            "4314803",
+            "4314902",
+            "4316006",
+            "4317608",
+            "4318408",
+            "4318705",
+            "4319505",
+            "4319901",
+            "4320008",
+            "4321204",
+            "4322004",
+            "4323002"
+          ],
+          "subcategories": []
+        }
+      ]
+    },
+    {
+      "code": "5002704",
+      "name": "Campo Grande",
+      "state": "MS",
+      "areas": []
+    },
+    {
+      "code": "5103403",
+      "name": "CUIABÁ",
+      "state": "MT",
+      "areas": [
+        {
+          "code": "07601",
+          "name": "Região Metropolitana do Vale do Rio Cuiabá",
+          "members": [
+            "5100102",
+            "5102678",
+            "5103007",
+            "5103403",
+            "5106109",
+            "5107800",
+            "5108402"
+          ],
+          "subcategories": []
+        }
+      ]
+    },
+    {
+      "code": "5208707",
+      "name": "GOIÂNIA",
+      "state": "GO",
+      "areas": [
+        {
+          "code": "07701",
+          "name": "Região Metropolitana de Goiânia",
+          "members": [
+            "5200050",
+            "5201405",
+            "5201801",
+            "5203302",
+            "5203559",
+            "5203609",
+            "5204557",
+            "5205208",
+            "5208400",
+            "5208707",
+            "5208806",
+            "5209200",
+            "5209705",
+            "5210000",
+            "5214507",
+            "5215009",
+            "5219100",
+            "5219738",
+            "5220454",
+            "5221197",
+            "5221403"
+          ],
+          "subcategories": []
+        }
+      ]
+    },
+    {
+      "code": "5300108",
+      "name": "BRASÍLIA",
+      "state": "DF",
+      "areas": [
+        {
+          "code": "07801",
+          "name": "Região Integrada de Desenvolvimento do Distrito Federal e Entorno",
+          "members": [
+            "3104502",
+            "3109303",
+            "3109451",
+            "3170404",
+            "5200100",
+            "5200175",
+            "5200258",
+            "5200308",
+            "5200605",
+            "5200803",
+            "5203203",
+            "5204003",
+            "5205307",
+            "5205497",
+            "5205513",
+            "5205802",
+            "5206206",
+            "5207907",
+            "5208004",
+            "5208608",
+            "5212501",
+            "5213053",
+            "5214606",
+            "5215231",
+            "5215603",
+            "5217302",
+            "5217609",
+            "5219753",
+            "5220009",
+            "5220686",
+            "5221858",
+            "5222203",
+            "5222302",
+            "5300108"
+          ],
+          "subcategories": []
+        }
+      ]
+    }
+  ],
+  "municipalities": [
+    {
+      "code": "1100205",
+      "name": "PORTO VELHO",
+      "state": "RO"
+    },
+    {
+      "code": "1100809",
+      "name": "CANDEIAS DO JAMARI",
+      "state": "RO"
+    },
+    {
+      "code": "1200401",
+      "name": "Rio Branco",
+      "state": "AC"
+    },
+    {
+      "code": "1300300",
+      "name": "AUTAZES",
+      "state": "AM"
+    },
+    {
+      "code": "1301100",
+      "name": "CAREIRO",
+      "state": "AM"
+    },
+    {
+      "code": "1301159",
+      "name": "CAREIRO DA VÁRZEA",
+      "state": "AM"
+    },
+    {
+      "code": "1301852",
+      "name": "IRANDUBA",
+      "state": "AM"
+    },
+    {
+      "code": "1301902",
+      "name": "ITACOATIARA",
+      "state": "AM"
+    },
+    {
+      "code": "1302009",
+      "name": "ITAPIRANGA",
+      "state": "AM"
+    },
+    {
+      "code": "1302504",
+      "name": "MANACAPURU",
+      "state": "AM"
+    },
+    {
+      "code": "1302553",
+      "name": "MANAQUIRI",
+      "state": "AM"
+    },
+    {
+      "code": "1302603",
+      "name": "MANAUS",
+      "state": "AM"
+    },
+    {
+      "code": "1303205",
+      "name": "NOVO AIRÃO",
+      "state": "AM"
+    },
+    {
+      "code": "1303536",
+      "name": "PRESIDENTE FIGUEIREDO",
+      "state": "AM"
+    },
+    {
+      "code": "1303569",
+      "name": "RIO PRETO DA EVA",
+      "state": "AM"
+    },
+    {
+      "code": "1304005",
+      "name": "SILVES",
+      "state": "AM"
+    },
+    {
+      "code": "1400050",
+      "name": "ALTO ALEGRE",
+      "state": "RR"
+    },
+    {
+      "code": "1400100",
+      "name": "BOA VISTA",
+      "state": "RR"
+    },
+    {
+      "code": "1400159",
+      "name": "BONFIM",
+      "state": "RR"
+    },
+    {
+      "code": "1400175",
+      "name": "CANTÁ",
+      "state": "RR"
+    },
+    {
+      "code": "1400308",
+      "name": "MUCAJAÍ",
+      "state": "RR"
+    },
+    {
+      "code": "1500800",
+      "name": "ANANINDEUA",
+      "state": "PA"
+    },
+    {
+      "code": "1501303",
+      "name": "BARCARENA",
+      "state": "PA"
+    },
+    {
+      "code": "1501402",
+      "name": "BELÉM",
+      "state": "PA"
+    },
+    {
+      "code": "1501501",
+      "name": "BENEVIDES",
+      "state": "PA"
+    },
+    {
+      "code": "1502400",
+      "name": "CASTANHAL",
+      "state": "PA"
+    },
+    {
+      "code": "1504422",
+      "name": "MARITUBA",
+      "state": "PA"
+    },
+    {
+      "code": "1506351",
+      "name": "SANTA BÁRBARA DO PARÁ",
+      "state": "PA"
+    },
+    {
+      "code": "1506500",
+      "name": "SANTA IZABEL DO PARÁ",
+      "state": "PA"
+    },
+    {
+      "code": "1600303",
+      "name": "MACAPÁ",
+      "state": "AP"
+    },
+    {
+      "code": "1600402",
+      "name": "MAZAGÃO",
+      "state": "AP"
+    },
+    {
+      "code": "1600600",
+      "name": "SANTANA",
+      "state": "AP"
+    },
+    {
+      "code": "1701101",
+      "name": "APARECIDA DO RIO NEGRO",
+      "state": "TO"
+    },
+    {
+      "code": "1703107",
+      "name": "BARROLÂNDIA",
+      "state": "TO"
+    },
+    {
+      "code": "1703701",
+      "name": "BREJINHO DE NAZARÉ",
+      "state": "TO"
+    },
+    {
+      "code": "1704600",
+      "name": "CHAPADA DE AREIA",
+      "state": "TO"
+    },
+    {
+      "code": "1706100",
+      "name": "CRISTALÂNDIA",
+      "state": "TO"
+    },
+    {
+      "code": "1707108",
+      "name": "DIVINÓPOLIS DO TOCANTINS",
+      "state": "TO"
+    },
+    {
+      "code": "1707553",
+      "name": "FÁTIMA",
+      "state": "TO"
+    },
+    {
+      "code": "1709807",
+      "name": "IPUEIRAS",
+      "state": "TO"
+    },
+    {
+      "code": "1711902",
+      "name": "LAGOA DA CONFUSÃO",
+      "state": "TO"
+    },
+    {
+      "code": "1711951",
+      "name": "LAGOA DO TOCANTINS",
+      "state": "TO"
+    },
+    {
+      "code": "1712009",
+      "name": "LAJEADO",
+      "state": "TO"
+    },
+    {
+      "code": "1712405",
+      "name": "LIZARDA",
+      "state": "TO"
+    },
+    {
+      "code": "1712702",
+      "name": "MATEIROS",
+      "state": "TO"
+    },
+    {
+      "code": "1713205",
+      "name": "MIRACEMA DO TOCANTINS",
+      "state": "TO"
+    },
+    {
+      "code": "1713304",
+      "name": "MIRANORTE",
+      "state": "TO"
+    },
+    {
+      "code": "1713601",
+      "name": "MONTE DO CARMO",
+      "state": "TO"
+    },
+    {
+      "code": "1713700",
+      "name": "MONTE SANTO DO TOCANTINS",
+      "state": "TO"
+    },
+    {
+      "code": "1715002",
+      "name": "NOVA ROSALÂNDIA",
+      "state": "TO"
+    },
+    {
+      "code": "1715101",
+      "name": "NOVO ACORDO",
+      "state": "TO"
+    },
+    {
+      "code": "1715507",
+      "name": "OLIVEIRA DE FÁTIMA",
+      "state": "TO"
+    },
+    {
+      "code": "1716109",
+      "name": "PARAÍSO DO TOCANTINS",
+      "state": "TO"
+    },
+    {
+      "code": "1717909",
+      "name": "PONTE ALTA DO TOCANTINS",
+      "state": "TO"
+    },
+    {
+      "code": "1718204",
+      "name": "PORTO NACIONAL",
+      "state": "TO"
+    },
+    {
+      "code": "1718451",
+      "name": "PUGMIL",
+      "state": "TO"
+    },
+    {
+      "code": "1718709",
+      "name": "RIO DOS BOIS",
+      "state": "TO"
+    },
+    {
+      "code": "1718758",
+      "name": "RIO SONO",
+      "state": "TO"
+    },
+    {
+      "code": "1719004",
+      "name": "SANTA TEREZA DO TOCANTINS",
+      "state": "TO"
+    },
+    {
+      "code": "1720150",
+      "name": "SÃO FÉLIX DO TOCANTINS",
+      "state": "TO"
+    },
+    {
+      "code": "1720655",
+      "name": "SILVANÓPOLIS",
+      "state": "TO"
+    },
+    {
+      "code": "1721000",
+      "name": "PALMAS",
+      "state": "TO"
+    },
+    {
+      "code": "1721109",
+      "name": "TOCANTÍNIA",
+      "state": "TO"
+    },
+    {
+      "code": "2100204",
+      "name": "ALCÂNTARA",
+      "state": "MA"
+    },
+    {
+      "code": "2101103",
+      "name": "AXIXÁ",
+      "state": "MA"
+    },
+    {
+      "code": "2101251",
+      "name": "BACABEIRA",
+      "state": "MA"
+    },
+    {
+      "code": "2102374",
+      "name": "CACHOEIRA GRANDE",
+      "state": "MA"
+    },
+    {
+      "code": "2105104",
+      "name": "ICATU",
+      "state": "MA"
+    },
+    {
+      "code": "2107100",
+      "name": "MORROS",
+      "state": "MA"
+    },
+    {
+      "code": "2107506",
+      "name": "PAÇO DO LUMIAR",
+      "state": "MA"
+    },
+    {
+      "code": "2109205",
+      "name": "PRESIDENTE JUSCELINO",
+      "state": "MA"
+    },
+    {
+      "code": "2109452",
+      "name": "RAPOSA",
+      "state": "MA"
+    },
+    {
+      "code": "2109601",
+      "name": "ROSÁRIO",
+      "state": "MA"
+    },
+    {
+      "code": "2110203",
+      "name": "SANTA RITA",
+      "state": "MA"
+    },
+    {
+      "code": "2111201",
+      "name": "SÃO JOSÉ DE RIBAMAR",
+      "state": "MA"
+    },
+    {
+      "code": "2111300",
+      "name": "SÃO LUÍS",
+      "state": "MA"
+    },
+    {
+      "code": "2112209",
+      "name": "TIMON",
+      "state": "MA"
+    },
+    {
+      "code": "2200400",
+      "name": "ALTOS",
+      "state": "PI"
+    },
+    {
+      "code": "2201606",
+      "name": "BENEDITINOS",
+      "state": "PI"
+    },
+    {
+      "code": "2202737",
+      "name": "COIVARAS",
+      "state": "PI"
+    },
+    {
+      "code": "2203255",
+      "name": "CURRALINHOS",
+      "state": "PI"
+    },
+    {
+      "code": "2203305",
+      "name": "DEMERVAL LOBÃO",
+      "state": "PI"
+    },
+    {
+      "code": "2205508",
+      "name": "JOSÉ DE FREITAS",
+      "state": "PI"
+    },
+    {
+      "code": "2205557",
+      "name": "LAGOA ALEGRE",
+      "state": "PI"
+    },
+    {
+      "code": "2205581",
+      "name": "LAGOA DO PIAUÍ",
+      "state": "PI"
+    },
+    {
+      "code": "2206308",
+      "name": "MIGUEL LEÃO",
+      "state": "PI"
+    },
+    {
+      "code": "2206407",
+      "name": "MONSENHOR GIL",
+      "state": "PI"
+    },
+    {
+      "code": "2206720",
+      "name": "NAZÁRIA",
+      "state": "PI"
+    },
+    {
+      "code": "2211001",
+      "name": "TERESINA",
+      "state": "PI"
+    },
+    {
+      "code": "2211100",
+      "name": "UNIÃO",
+      "state": "PI"
+    },
+    {
+      "code": "2301000",
+      "name": "AQUIRAZ",
+      "state": "CE"
+    },
+    {
+      "code": "2303501",
+      "name": "CASCAVEL",
+      "state": "CE"
+    },
+    {
+      "code": "2303709",
+      "name": "CAUCAIA",
+      "state": "CE"
+    },
+    {
+      "code": "2303956",
+      "name": "CHOROZINHO",
+      "state": "CE"
+    },
+    {
+      "code": "2304285",
+      "name": "EUSÉBIO",
+      "state": "CE"
+    },
+    {
+      "code": "2304400",
+      "name": "FORTALEZA",
+      "state": "CE"
+    },
+    {
+      "code": "2304954",
+      "name": "GUAIÚBA",
+      "state": "CE"
+    },
+    {
+      "code": "2305233",
+      "name": "HORIZONTE",
+      "state": "CE"
+    },
+    {
+      "code": "2306256",
+      "name": "ITAITINGA",
+      "state": "CE"
+    },
+    {
+      "code": "2307650",
+      "name": "MARACANAÚ",
+      "state": "CE"
+    },
+    {
+      "code": "2307700",
+      "name": "MARANGUAPE",
+      "state": "CE"
+    },
+    {
+      "code": "2309607",
+      "name": "PACAJUS",
+      "state": "CE"
+    },
+    {
+      "code": "2309706",
+      "name": "PACATUBA",
+      "state": "CE"
+    },
+    {
+      "code": "2310209",
+      "name": "PARACURU",
+      "state": "CE"
+    },
+    {
+      "code": "2310258",
+      "name": "PARAIPABA",
+      "state": "CE"
+    },
+    {
+      "code": "2310852",
+      "name": "PINDORETAMA",
+      "state": "CE"
+    },
+    {
+      "code": "2312403",
+      "name": "SÃO GONÇALO DO AMARANTE",
+      "state": "CE"
+    },
+    {
+      "code": "2312601",
+      "name": "SÃO LUÍS DO CURU",
+      "state": "CE"
+    },
+    {
+      "code": "2313500",
+      "name": "TRAIRI",
+      "state": "CE"
+    },
+    {
+      "code": "2401206",
+      "name": "AREZ",
+      "state": "RN"
+    },
+    {
+      "code": "2401701",
+      "name": "BOM JESUS",
+      "state": "RN"
+    },
+    {
+      "code": "2402600",
+      "name": "CEARÁ-MIRIM",
+      "state": "RN"
+    },
+    {
+      "code": "2403251",
+      "name": "PARNAMIRIM",
+      "state": "RN"
+    },
+    {
+      "code": "2403608",
+      "name": "EXTREMOZ",
+      "state": "RN"
+    },
+    {
+      "code": "2404200",
+      "name": "GOIANINHA",
+      "state": "RN"
+    },
+    {
+      "code": "2404606",
+      "name": "IELMO MARINHO",
+      "state": "RN"
+    },
+    {
+      "code": "2407104",
+      "name": "MACAÍBA",
+      "state": "RN"
+    },
+    {
+      "code": "2407500",
+      "name": "MAXARANGUAPE",
+      "state": "RN"
+    },
+    {
+      "code": "2407807",
+      "name": "MONTE ALEGRE",
+      "state": "RN"
+    },
+    {
+      "code": "2408102",
+      "name": "NATAL",
+      "state": "RN"
+    },
+    {
+      "code": "2408201",
+      "name": "NÍSIA FLORESTA",
+      "state": "RN"
+    },
+    {
+      "code": "2412005",
+      "name": "SÃO GONÇALO DO AMARANTE",
+      "state": "RN"
+    },
+    {
+      "code": "2412203",
+      "name": "SÃO JOSÉ DE MIPIBU",
+      "state": "RN"
+    },
+    {
+      "code": "2414803",
+      "name": "VERA CRUZ",
+      "state": "RN"
+    },
+    {
+      "code": "2500601",
+      "name": "ALHANDRA",
+      "state": "PB"
+    },
+    {
+      "code": "2501807",
+      "name": "BAYEUX",
+      "state": "PB"
+    },
+    {
+      "code": "2503001",
+      "name": "CAAPORÃ",
+      "state": "PB"
+    },
+    {
+      "code": "2503209",
+      "name": "CABEDELO",
+      "state": "PB"
+    },
+    {
+      "code": "2504603",
+      "name": "CONDE",
+      "state": "PB"
+    },
+    {
+      "code": "2504900",
+      "name": "CRUZ DO ESPÍRITO SANTO",
+      "state": "PB"
+    },
+    {
+      "code": "2507507",
+      "name": "JOÃO PESSOA",
+      "state": "PB"
+    },
+    {
+      "code": "2508604",
+      "name": "LUCENA",
+      "state": "PB"
+    },
+    {
+      "code": "2511202",
+      "name": "PEDRAS DE FOGO",
+      "state": "PB"
+    },
+    {
+      "code": "2511905",
+      "name": "PITIMBU",
+      "state": "PB"
+    },
+    {
+      "code": "2512903",
+      "name": "RIO TINTO",
+      "state": "PB"
+    },
+    {
+      "code": "2513703",
+      "name": "SANTA RITA",
+      "state": "PB"
+    },
+    {
+      "code": "2600054",
+      "name": "ABREU E LIMA",
+      "state": "PE"
+    },
+    {
+      "code": "2601052",
+      "name": "ARAÇOIABA",
+      "state": "PE"
+    },
+    {
+      "code": "2602902",
+      "name": "CABO DE SANTO AGOSTINHO",
+      "state": "PE"
+    },
+    {
+      "code": "2603454",
+      "name": "CAMARAGIBE",
+      "state": "PE"
+    },
+    {
+      "code": "2606804",
+      "name": "IGARASSU",
+      "state": "PE"
+    },
+    {
+      "code": "2607208",
+      "name": "IPOJUCA",
+      "state": "PE"
+    },
+    {
+      "code": "2607604",
+      "name": "ILHA DE ITAMARACÁ",
+      "state": "PE"
+    },
+    {
+      "code": "2607752",
+      "name": "ITAPISSUMA",
+      "state": "PE"
+    },
+    {
+      "code": "2607901",
+      "name": "JABOATÃO DOS GUARARAPES",
+      "state": "PE"
+    },
+    {
+      "code": "2609402",
+      "name": "MORENO",
+      "state": "PE"
+    },
+    {
+      "code": "2609600",
+      "name": "OLINDA",
+      "state": "PE"
+    },
+    {
+      "code": "2610707",
+      "name": "PAULISTA",
+      "state": "PE"
+    },
+    {
+      "code": "2611606",
+      "name": "RECIFE",
+      "state": "PE"
+    },
+    {
+      "code": "2613701",
+      "name": "SÃO LOURENÇO DA MATA",
+      "state": "PE"
+    },
+    {
+      "code": "2700409",
+      "name": "ATALAIA",
+      "state": "AL"
+    },
+    {
+      "code": "2700508",
+      "name": "BARRA DE SANTO ANTÔNIO",
+      "state": "AL"
+    },
+    {
+      "code": "2700607",
+      "name": "BARRA DE SÃO MIGUEL",
+      "state": "AL"
+    },
+    {
+      "code": "2702207",
+      "name": "COQUEIRO SECO",
+      "state": "AL"
+    },
+    {
+      "code": "2704302",
+      "name": "MACEIÓ",
+      "state": "AL"
+    },
+    {
+      "code": "2704708",
+      "name": "MARECHAL DEODORO",
+      "state": "AL"
+    },
+    {
+      "code": "2705200",
+      "name": "MESSIAS",
+      "state": "AL"
+    },
+    {
+      "code": "2705507",
+      "name": "MURICI",
+      "state": "AL"
+    },
+    {
+      "code": "2706448",
+      "name": "PARIPUEIRA",
+      "state": "AL"
+    },
+    {
+      "code": "2706901",
+      "name": "PILAR",
+      "state": "AL"
+    },
+    {
+      "code": "2707701",
+      "name": "RIO LARGO",
+      "state": "AL"
+    },
+    {
+      "code": "2707909",
+      "name": "SANTA LUZIA DO NORTE",
+      "state": "AL"
+    },
+    {
+      "code": "2708907",
+      "name": "SATUBA",
+      "state": "AL"
+    },
+    {
+      "code": "2800308",
+      "name": "ARACAJU",
+      "state": "SE"
+    },
+    {
+      "code": "2800605",
+      "name": "BARRA DOS COQUEIROS",
+      "state": "SE"
+    },
+    {
+      "code": "2804805",
+      "name": "NOSSA SENHORA DO SOCORRO",
+      "state": "SE"
+    },
+    {
+      "code": "2806701",
+      "name": "SÃO CRISTÓVÃO",
+      "state": "SE"
+    },
+    {
+      "code": "2905701",
+      "name": "CAMAÇARI",
+      "state": "BA"
+    },
+    {
+      "code": "2906501",
+      "name": "CANDEIAS",
+      "state": "BA"
+    },
+    {
+      "code": "2910057",
+      "name": "DIAS D'ÁVILA",
+      "state": "BA"
+    },
+    {
+      "code": "2916104",
+      "name": "ITAPARICA",
+      "state": "BA"
+    },
+    {
+      "code": "2919207",
+      "name": "LAURO DE FREITAS",
+      "state": "BA"
+    },
+    {
+      "code": "2919926",
+      "name": "MADRE DE DEUS",
+      "state": "BA"
+    },
+    {
+      "code": "2921005",
+      "name": "MATA DE SÃO JOÃO",
+      "state": "BA"
+    },
+    {
+      "code": "2925204",
+      "name": "POJUCA",
+      "state": "BA"
+    },
+    {
+      "code": "2927408",
+      "name": "SALVADOR",
+      "state": "BA"
+    },
+    {
+      "code": "2929206",
+      "name": "SÃO FRANCISCO DO CONDE",
+      "state": "BA"
+    },
+    {
+      "code": "2929503",
+      "name": "SÃO SEBASTIÃO DO PASSÉ",
+      "state": "BA"
+    },
+    {
+      "code": "2930709",
+      "name": "SIMÕES FILHO",
+      "state": "BA"
+    },
+    {
+      "code": "2933208",
+      "name": "VERA CRUZ",
+      "state": "BA"
+    },
+    {
+      "code": "3104502",
+      "name": "ARINOS",
+      "state": "MG"
+    },
+    {
+      "code": "3105004",
+      "name": "BALDIM",
+      "state": "MG"
+    },
+    {
+      "code": "3106200",
+      "name": "BELO HORIZONTE",
+      "state": "MG"
+    },
+    {
+      "code": "3106705",
+      "name": "BETIM",
+      "state": "MG"
+    },
+    {
+      "code": "3109006",
+      "name": "BRUMADINHO",
+      "state": "MG"
+    },
+    {
+      "code": "3109303",
+      "name": "BURITIS",
+      "state": "MG"
+    },
+    {
+      "code": "3109451",
+      "name": "CABECEIRA GRANDE",
+      "state": "MG"
+    },
+    {
+      "code": "3110004",
+      "name": "CAETÉ",
+      "state": "MG"
+    },
+    {
+      "code": "3112505",
+      "name": "CAPIM BRANCO",
+      "state": "MG"
+    },
+    {
+      "code": "3117876",
+      "name": "CONFINS",
+      "state": "MG"
+    },
+    {
+      "code": "3118601",
+      "name": "CONTAGEM",
+      "state": "MG"
+    },
+    {
+      "code": "3124104",
+      "name": "ESMERALDAS",
+      "state": "MG"
+    },
+    {
+      "code": "3126000",
+      "name": "FLORESTAL",
+      "state": "MG"
+    },
+    {
+      "code": "3129806",
+      "name": "IBIRITÉ",
+      "state": "MG"
+    },
+    {
+      "code": "3130101",
+      "name": "IGARAPÉ",
+      "state": "MG"
+    },
+    {
+      "code": "3132206",
+      "name": "ITAGUARA",
+      "state": "MG"
+    },
+    {
+      "code": "3133709",
+      "name": "ITATIAIUÇU",
+      "state": "MG"
+    },
+    {
+      "code": "3134608",
+      "name": "JABOTICATUBAS",
+      "state": "MG"
+    },
+    {
+      "code": "3136603",
+      "name": "NOVA UNIÃO",
+      "state": "MG"
+    },
+    {
+      "code": "3136652",
+      "name": "JUATUBA",
+      "state": "MG"
+    },
+    {
+      "code": "3137601",
+      "name": "LAGOA SANTA",
+      "state": "MG"
+    },
+    {
+      "code": "3140159",
+      "name": "MÁRIO CAMPOS",
+      "state": "MG"
+    },
+    {
+      "code": "3140704",
+      "name": "MATEUS LEME",
+      "state": "MG"
+    },
+    {
+      "code": "3141108",
+      "name": "MATOZINHOS",
+      "state": "MG"
+    },
+    {
+      "code": "3144805",
+      "name": "NOVA LIMA",
+      "state": "MG"
+    },
+    {
+      "code": "3149309",
+      "name": "PEDRO LEOPOLDO",
+      "state": "MG"
+    },
+    {
+      "code": "3153905",
+      "name": "RAPOSOS",
+      "state": "MG"
+    },
+    {
+      "code": "3154606",
+      "name": "RIBEIRÃO DAS NEVES",
+      "state": "MG"
+    },
+    {
+      "code": "3154804",
+      "name": "RIO ACIMA",
+      "state": "MG"
+    },
+    {
+      "code": "3155306",
+      "name": "RIO MANSO",
+      "state": "MG"
+    },
+    {
+      "code": "3156700",
+      "name": "SABARÁ",
+      "state": "MG"
+    },
+    {
+      "code": "3157807",
+      "name": "SANTA LUZIA",
+      "state": "MG"
+    },
+    {
+      "code": "3162922",
+      "name": "SÃO JOAQUIM DE BICAS",
+      "state": "MG"
+    },
+    {
+      "code": "3162955",
+      "name": "SÃO JOSÉ DA LAPA",
+      "state": "MG"
+    },
+    {
+      "code": "3165537",
+      "name": "SARZEDO",
+      "state": "MG"
+    },
+    {
+      "code": "3168309",
+      "name": "TAQUARAÇU DE MINAS",
+      "state": "MG"
+    },
+    {
+      "code": "3170404",
+      "name": "UNAÍ",
+      "state": "MG"
+    },
+    {
+      "code": "3171204",
+      "name": "VESPASIANO",
+      "state": "MG"
+    },
+    {
+      "code": "3201308",
+      "name": "CARIACICA",
+      "state": "ES"
+    },
+    {
+      "code": "3202207",
+      "name": "FUNDÃO",
+      "state": "ES"
+    },
+    {
+      "code": "3202405",
+      "name": "GUARAPARI",
+      "state": "ES"
+    },
+    {
+      "code": "3205002",
+      "name": "SERRA",
+      "state": "ES"
+    },
+    {
+      "code": "3205101",
+      "name": "VIANA",
+      "state": "ES"
+    },
+    {
+      "code": "3205200",
+      "name": "VILA VELHA",
+      "state": "ES"
+    },
+    {
+      "code": "3205309",
+      "name": "VITÓRIA",
+      "state": "ES"
+    },
+    {
+      "code": "3300456",
+      "name": "BELFORD ROXO",
+      "state": "RJ"
+    },
+    {
+      "code": "3300803",
+      "name": "CACHOEIRAS DE MACACU",
+      "state": "RJ"
+    },
+    {
+      "code": "3301702",
+      "name": "DUQUE DE CAXIAS",
+      "state": "RJ"
+    },
+    {
+      "code": "3301850",
+      "name": "GUAPIMIRIM",
+      "state": "RJ"
+    },
+    {
+      "code": "3301900",
+      "name": "ITABORAÍ",
+      "state": "RJ"
+    },
+    {
+      "code": "3302007",
+      "name": "ITAGUAÍ",
+      "state": "RJ"
+    },
+    {
+      "code": "3302270",
+      "name": "JAPERI",
+      "state": "RJ"
+    },
+    {
+      "code": "3302502",
+      "name": "MAGÉ",
+      "state": "RJ"
+    },
+    {
+      "code": "3302700",
+      "name": "MARICÁ",
+      "state": "RJ"
+    },
+    {
+      "code": "3302858",
+      "name": "MESQUITA",
+      "state": "RJ"
+    },
+    {
+      "code": "3303203",
+      "name": "NILÓPOLIS",
+      "state": "RJ"
+    },
+    {
+      "code": "3303302",
+      "name": "NITERÓI",
+      "state": "RJ"
+    },
+    {
+      "code": "3303500",
+      "name": "NOVA IGUAÇU",
+      "state": "RJ"
+    },
+    {
+      "code": "3303609",
+      "name": "PARACAMBI",
+      "state": "RJ"
+    },
+    {
+      "code": "3303906",
+      "name": "PETRÓPOLIS",
+      "state": "RJ"
+    },
+    {
+      "code": "3304144",
+      "name": "QUEIMADOS",
+      "state": "RJ"
+    },
+    {
+      "code": "3304300",
+      "name": "RIO BONITO",
+      "state": "RJ"
+    },
+    {
+      "code": "3304557",
+      "name": "RIO DE JANEIRO",
+      "state": "RJ"
+    },
+    {
+      "code": "3304904",
+      "name": "SÃO GONÇALO",
+      "state": "RJ"
+    },
+    {
+      "code": "3305109",
+      "name": "SÃO JOÃO DE MERITI",
+      "state": "RJ"
+    },
+    {
+      "code": "3305554",
+      "name": "SEROPÉDICA",
+      "state": "RJ"
+    },
+    {
+      "code": "3305752",
+      "name": "TANGUÁ",
+      "state": "RJ"
+    },
+    {
+      "code": "3503901",
+      "name": "ARUJÁ",
+      "state": "SP"
+    },
+    {
+      "code": "3505708",
+      "name": "BARUERI",
+      "state": "SP"
+    },
+    {
+      "code": "3506607",
+      "name": "BIRITIBA MIRIM",
+      "state": "SP"
+    },
+    {
+      "code": "3509007",
+      "name": "CAIEIRAS",
+      "state": "SP"
+    },
+    {
+      "code": "3509205",
+      "name": "CAJAMAR",
+      "state": "SP"
+    },
+    {
+      "code": "3510609",
+      "name": "CARAPICUÍBA",
+      "state": "SP"
+    },
+    {
+      "code": "3513009",
+      "name": "COTIA",
+      "state": "SP"
+    },
+    {
+      "code": "3513801",
+      "name": "DIADEMA",
+      "state": "SP"
+    },
+    {
+      "code": "3515004",
+      "name": "EMBU DAS ARTES",
+      "state": "SP"
+    },
+    {
+      "code": "3515103",
+      "name": "EMBU-GUAÇU",
+      "state": "SP"
+    },
+    {
+      "code": "3515707",
+      "name": "FERRAZ DE VASCONCELOS",
+      "state": "SP"
+    },
+    {
+      "code": "3516309",
+      "name": "FRANCISCO MORATO",
+      "state": "SP"
+    },
+    {
+      "code": "3516408",
+      "name": "FRANCO DA ROCHA",
+      "state": "SP"
+    },
+    {
+      "code": "3518305",
+      "name": "GUARAREMA",
+      "state": "SP"
+    },
+    {
+      "code": "3518800",
+      "name": "GUARULHOS",
+      "state": "SP"
+    },
+    {
+      "code": "3522208",
+      "name": "ITAPECERICA DA SERRA",
+      "state": "SP"
+    },
+    {
+      "code": "3522505",
+      "name": "ITAPEVI",
+      "state": "SP"
+    },
+    {
+      "code": "3523107",
+      "name": "ITAQUAQUECETUBA",
+      "state": "SP"
+    },
+    {
+      "code": "3525003",
+      "name": "JANDIRA",
+      "state": "SP"
+    },
+    {
+      "code": "3526209",
+      "name": "JUQUITIBA",
+      "state": "SP"
+    },
+    {
+      "code": "3528502",
+      "name": "MAIRIPORÃ",
+      "state": "SP"
+    },
+    {
+      "code": "3529401",
+      "name": "MAUÁ",
+      "state": "SP"
+    },
+    {
+      "code": "3530607",
+      "name": "MOGI DAS CRUZES",
+      "state": "SP"
+    },
+    {
+      "code": "3534401",
+      "name": "OSASCO",
+      "state": "SP"
+    },
+    {
+      "code": "3539103",
+      "name": "PIRAPORA DO BOM JESUS",
+      "state": "SP"
+    },
+    {
+      "code": "3539806",
+      "name": "POÁ",
+      "state": "SP"
+    },
+    {
+      "code": "3543303",
+      "name": "RIBEIRÃO PIRES",
+      "state": "SP"
+    },
+    {
+      "code": "3544103",
+      "name": "RIO GRANDE DA SERRA",
+      "state": "SP"
+    },
+    {
+      "code": "3545001",
+      "name": "SALESÓPOLIS",
+      "state": "SP"
+    },
+    {
+      "code": "3546801",
+      "name": "SANTA ISABEL",
+      "state": "SP"
+    },
+    {
+      "code": "3547304",
+      "name": "SANTANA DE PARNAÍBA",
+      "state": "SP"
+    },
+    {
+      "code": "3547809",
+      "name": "SANTO ANDRÉ",
+      "state": "SP"
+    },
+    {
+      "code": "3548708",
+      "name": "SÃO BERNARDO DO CAMPO",
+      "state": "SP"
+    },
+    {
+      "code": "3548807",
+      "name": "SÃO CAETANO DO SUL",
+      "state": "SP"
+    },
+    {
+      "code": "3549953",
+      "name": "SÃO LOURENÇO DA SERRA",
+      "state": "SP"
+    },
+    {
+      "code": "3550308",
+      "name": "SÃO PAULO",
+      "state": "SP"
+    },
+    {
+      "code": "3552502",
+      "name": "SUZANO",
+      "state": "SP"
+    },
+    {
+      "code": "3552809",
+      "name": "TABOÃO DA SERRA",
+      "state": "SP"
+    },
+    {
+      "code": "3556453",
+      "name": "VARGEM GRANDE PAULISTA",
+      "state": "SP"
+    },
+    {
+      "code": "4100202",
+      "name": "ADRIANÓPOLIS",
+      "state": "PR"
+    },
+    {
+      "code": "4100301",
+      "name": "AGUDOS DO SUL",
+      "state": "PR"
+    },
+    {
+      "code": "4100400",
+      "name": "ALMIRANTE TAMANDARÉ",
+      "state": "PR"
+    },
+    {
+      "code": "4101804",
+      "name": "ARAUCÁRIA",
+      "state": "PR"
+    },
+    {
+      "code": "4102307",
+      "name": "BALSA NOVA",
+      "state": "PR"
+    },
+    {
+      "code": "4103107",
+      "name": "BOCAIÚVA DO SUL",
+      "state": "PR"
+    },
+    {
+      "code": "4104006",
+      "name": "CAMPINA GRANDE DO SUL",
+      "state": "PR"
+    },
+    {
+      "code": "4104105",
+      "name": "CAMPO DO TENENTE",
+      "state": "PR"
+    },
+    {
+      "code": "4104204",
+      "name": "CAMPO LARGO",
+      "state": "PR"
+    },
+    {
+      "code": "4104253",
+      "name": "CAMPO MAGRO",
+      "state": "PR"
+    },
+    {
+      "code": "4105201",
+      "name": "CERRO AZUL",
+      "state": "PR"
+    },
+    {
+      "code": "4105805",
+      "name": "COLOMBO",
+      "state": "PR"
+    },
+    {
+      "code": "4106209",
+      "name": "CONTENDA",
+      "state": "PR"
+    },
+    {
+      "code": "4106902",
+      "name": "CURITIBA",
+      "state": "PR"
+    },
+    {
+      "code": "4107652",
+      "name": "FAZENDA RIO GRANDE",
+      "state": "PR"
+    },
+    {
+      "code": "4111258",
+      "name": "ITAPERUÇU",
+      "state": "PR"
+    },
+    {
+      "code": "4113205",
+      "name": "LAPA",
+      "state": "PR"
+    },
+    {
+      "code": "4114302",
+      "name": "MANDIRITUBA",
+      "state": "PR"
+    },
+    {
+      "code": "4119103",
+      "name": "PIÊN",
+      "state": "PR"
+    },
+    {
+      "code": "4119152",
+      "name": "PINHAIS",
+      "state": "PR"
+    },
+    {
+      "code": "4119509",
+      "name": "PIRAQUARA",
+      "state": "PR"
+    },
+    {
+      "code": "4120804",
+      "name": "QUATRO BARRAS",
+      "state": "PR"
+    },
+    {
+      "code": "4121208",
+      "name": "QUITANDINHA",
+      "state": "PR"
+    },
+    {
+      "code": "4122206",
+      "name": "RIO BRANCO DO SUL",
+      "state": "PR"
+    },
+    {
+      "code": "4122305",
+      "name": "RIO NEGRO",
+      "state": "PR"
+    },
+    {
+      "code": "4125506",
+      "name": "SÃO JOSÉ DOS PINHAIS",
+      "state": "PR"
+    },
+    {
+      "code": "4127601",
+      "name": "TIJUCAS DO SUL",
+      "state": "PR"
+    },
+    {
+      "code": "4127882",
+      "name": "TUNAS DO PARANÁ",
+      "state": "PR"
+    },
+    {
+      "code": "4128633",
+      "name": "DOUTOR ULYSSES",
+      "state": "PR"
+    },
+    {
+      "code": "4200606",
+      "name": "ÁGUAS MORNAS",
+      "state": "SC"
+    },
+    {
+      "code": "4200705",
+      "name": "ALFREDO WAGNER",
+      "state": "SC"
+    },
+    {
+      "code": "4200903",
+      "name": "ANGELINA",
+      "state": "SC"
+    },
+    {
+      "code": "4201109",
+      "name": "ANITÁPOLIS",
+      "state": "SC"
+    },
+    {
+      "code": "4201208",
+      "name": "ANTÔNIO CARLOS",
+      "state": "SC"
+    },
+    {
+      "code": "4202305",
+      "name": "BIGUAÇU",
+      "state": "SC"
+    },
+    {
+      "code": "4203709",
+      "name": "CANELINHA",
+      "state": "SC"
+    },
+    {
+      "code": "4205407",
+      "name": "FLORIANÓPOLIS",
+      "state": "SC"
+    },
+    {
+      "code": "4205704",
+      "name": "GAROPABA",
+      "state": "SC"
+    },
+    {
+      "code": "4206009",
+      "name": "GOVERNADOR CELSO RAMOS",
+      "state": "SC"
+    },
+    {
+      "code": "4209805",
+      "name": "LEOBERTO LEAL",
+      "state": "SC"
+    },
+    {
+      "code": "4210209",
+      "name": "MAJOR GERCINO",
+      "state": "SC"
+    },
+    {
+      "code": "4211504",
+      "name": "NOVA TRENTO",
+      "state": "SC"
+    },
+    {
+      "code": "4211900",
+      "name": "PALHOÇA",
+      "state": "SC"
+    },
+    {
+      "code": "4212304",
+      "name": "PAULO LOPES",
+      "state": "SC"
+    },
+    {
+      "code": "4214300",
+      "name": "RANCHO QUEIMADO",
+      "state": "SC"
+    },
+    {
+      "code": "4215703",
+      "name": "SANTO AMARO DA IMPERATRIZ",
+      "state": "SC"
+    },
+    {
+      "code": "4215901",
+      "name": "SÃO BONIFÁCIO",
+      "state": "SC"
+    },
+    {
+      "code": "4216305",
+      "name": "SÃO JOÃO BATISTA",
+      "state": "SC"
+    },
+    {
+      "code": "4216602",
+      "name": "SÃO JOSÉ",
+      "state": "SC"
+    },
+    {
+      "code": "4217253",
+      "name": "SÃO PEDRO DE ALCÂNTARA",
+      "state": "SC"
+    },
+    {
+      "code": "4218004",
+      "name": "TIJUCAS",
+      "state": "SC"
+    },
+    {
+      "code": "4300604",
+      "name": "ALVORADA",
+      "state": "RS"
+    },
+    {
+      "code": "4300877",
+      "name": "ARARICÁ",
+      "state": "RS"
+    },
+    {
+      "code": "4301107",
+      "name": "ARROIO DOS RATOS",
+      "state": "RS"
+    },
+    {
+      "code": "4303103",
+      "name": "CACHOEIRINHA",
+      "state": "RS"
+    },
+    {
+      "code": "4303905",
+      "name": "CAMPO BOM",
+      "state": "RS"
+    },
+    {
+      "code": "4304606",
+      "name": "CANOAS",
+      "state": "RS"
+    },
+    {
+      "code": "4304689",
+      "name": "CAPELA DE SANTANA",
+      "state": "RS"
+    },
+    {
+      "code": "4305355",
+      "name": "CHARQUEADAS",
+      "state": "RS"
+    },
+    {
+      "code": "4306403",
+      "name": "DOIS IRMÃOS",
+      "state": "RS"
+    },
+    {
+      "code": "4306767",
+      "name": "ELDORADO DO SUL",
+      "state": "RS"
+    },
+    {
+      "code": "4307609",
+      "name": "ESTÂNCIA VELHA",
+      "state": "RS"
+    },
+    {
+      "code": "4307708",
+      "name": "ESTEIO",
+      "state": "RS"
+    },
+    {
+      "code": "4309050",
+      "name": "GLORINHA",
+      "state": "RS"
+    },
+    {
+      "code": "4309209",
+      "name": "GRAVATAÍ",
+      "state": "RS"
+    },
+    {
+      "code": "4309308",
+      "name": "GUAÍBA",
+      "state": "RS"
+    },
+    {
+      "code": "4310108",
+      "name": "IGREJINHA",
+      "state": "RS"
+    },
+    {
+      "code": "4310801",
+      "name": "IVOTI",
+      "state": "RS"
+    },
+    {
+      "code": "4312401",
+      "name": "MONTENEGRO",
+      "state": "RS"
+    },
+    {
+      "code": "4313060",
+      "name": "NOVA HARTZ",
+      "state": "RS"
+    },
+    {
+      "code": "4313375",
+      "name": "NOVA SANTA RITA",
+      "state": "RS"
+    },
+    {
+      "code": "4313409",
+      "name": "NOVO HAMBURGO",
+      "state": "RS"
+    },
+    {
+      "code": "4314050",
+      "name": "PAROBÉ",
+      "state": "RS"
+    },
+    {
+      "code": "4314803",
+      "name": "PORTÃO",
+      "state": "RS"
+    },
+    {
+      "code": "4314902",
+      "name": "PORTO ALEGRE",
+      "state": "RS"
+    },
+    {
+      "code": "4316006",
+      "name": "ROLANTE",
+      "state": "RS"
+    },
+    {
+      "code": "4317608",
+      "name": "SANTO ANTÔNIO DA PATRULHA",
+      "state": "RS"
+    },
+    {
+      "code": "4318408",
+      "name": "SÃO JERÔNIMO",
+      "state": "RS"
+    },
+    {
+      "code": "4318705",
+      "name": "SÃO LEOPOLDO",
+      "state": "RS"
+    },
+    {
+      "code": "4319505",
+      "name": "SÃO SEBASTIÃO DO CAÍ",
+      "state": "RS"
+    },
+    {
+      "code": "4319901",
+      "name": "SAPIRANGA",
+      "state": "RS"
+    },
+    {
+      "code": "4320008",
+      "name": "SAPUCAIA DO SUL",
+      "state": "RS"
+    },
+    {
+      "code": "4321204",
+      "name": "TAQUARA",
+      "state": "RS"
+    },
+    {
+      "code": "4322004",
+      "name": "TRIUNFO",
+      "state": "RS"
+    },
+    {
+      "code": "4323002",
+      "name": "VIAMÃO",
+      "state": "RS"
+    },
+    {
+      "code": "5002704",
+      "name": "Campo Grande",
+      "state": "MS"
+    },
+    {
+      "code": "5100102",
+      "name": "ACORIZAL",
+      "state": "MT"
+    },
+    {
+      "code": "5102678",
+      "name": "CAMPO VERDE",
+      "state": "MT"
+    },
+    {
+      "code": "5103007",
+      "name": "CHAPADA DOS GUIMARÃES",
+      "state": "MT"
+    },
+    {
+      "code": "5103403",
+      "name": "CUIABÁ",
+      "state": "MT"
+    },
+    {
+      "code": "5106109",
+      "name": "NOSSA SENHORA DO LIVRAMENTO",
+      "state": "MT"
+    },
+    {
+      "code": "5107800",
+      "name": "SANTO ANTÔNIO DE LEVERGER",
+      "state": "MT"
+    },
+    {
+      "code": "5108402",
+      "name": "VÁRZEA GRANDE",
+      "state": "MT"
+    },
+    {
+      "code": "5200050",
+      "name": "ABADIA DE GOIÁS",
+      "state": "GO"
+    },
+    {
+      "code": "5200100",
+      "name": "ABADIÂNIA",
+      "state": "GO"
+    },
+    {
+      "code": "5200175",
+      "name": "ÁGUA FRIA DE GOIÁS",
+      "state": "GO"
+    },
+    {
+      "code": "5200258",
+      "name": "ÁGUAS LINDAS DE GOIÁS",
+      "state": "GO"
+    },
+    {
+      "code": "5200308",
+      "name": "ALEXÂNIA",
+      "state": "GO"
+    },
+    {
+      "code": "5200605",
+      "name": "ALTO PARAÍSO DE GOIÁS",
+      "state": "GO"
+    },
+    {
+      "code": "5200803",
+      "name": "ALVORADA DO NORTE",
+      "state": "GO"
+    },
+    {
+      "code": "5201405",
+      "name": "APARECIDA DE GOIÂNIA",
+      "state": "GO"
+    },
+    {
+      "code": "5201801",
+      "name": "ARAGOIÂNIA",
+      "state": "GO"
+    },
+    {
+      "code": "5203203",
+      "name": "BARRO ALTO",
+      "state": "GO"
+    },
+    {
+      "code": "5203302",
+      "name": "BELA VISTA DE GOIÁS",
+      "state": "GO"
+    },
+    {
+      "code": "5203559",
+      "name": "BONFINÓPOLIS",
+      "state": "GO"
+    },
+    {
+      "code": "5203609",
+      "name": "BRAZABRANTES",
+      "state": "GO"
+    },
+    {
+      "code": "5204003",
+      "name": "CABECEIRAS",
+      "state": "GO"
+    },
+    {
+      "code": "5204557",
+      "name": "CALDAZINHA",
+      "state": "GO"
+    },
+    {
+      "code": "5205208",
+      "name": "CATURAÍ",
+      "state": "GO"
+    },
+    {
+      "code": "5205307",
+      "name": "CAVALCANTE",
+      "state": "GO"
+    },
+    {
+      "code": "5205497",
+      "name": "CIDADE OCIDENTAL",
+      "state": "GO"
+    },
+    {
+      "code": "5205513",
+      "name": "COCALZINHO DE GOIÁS",
+      "state": "GO"
+    },
+    {
+      "code": "5205802",
+      "name": "CORUMBÁ DE GOIÁS",
+      "state": "GO"
+    },
+    {
+      "code": "5206206",
+      "name": "CRISTALINA",
+      "state": "GO"
+    },
+    {
+      "code": "5207907",
+      "name": "FLORES DE GOIÁS",
+      "state": "GO"
+    },
+    {
+      "code": "5208004",
+      "name": "FORMOSA",
+      "state": "GO"
+    },
+    {
+      "code": "5208400",
+      "name": "GOIANÁPOLIS",
+      "state": "GO"
+    },
+    {
+      "code": "5208608",
+      "name": "GOIANÉSIA",
+      "state": "GO"
+    },
+    {
+      "code": "5208707",
+      "name": "GOIÂNIA",
+      "state": "GO"
+    },
+    {
+      "code": "5208806",
+      "name": "GOIANIRA",
+      "state": "GO"
+    },
+    {
+      "code": "5209200",
+      "name": "GUAPÓ",
+      "state": "GO"
+    },
+    {
+      "code": "5209705",
+      "name": "HIDROLÂNDIA",
+      "state": "GO"
+    },
+    {
+      "code": "5210000",
+      "name": "INHUMAS",
+      "state": "GO"
+    },
+    {
+      "code": "5212501",
+      "name": "LUZIÂNIA",
+      "state": "GO"
+    },
+    {
+      "code": "5213053",
+      "name": "MIMOSO DE GOIÁS",
+      "state": "GO"
+    },
+    {
+      "code": "5214507",
+      "name": "NERÓPOLIS",
+      "state": "GO"
+    },
+    {
+      "code": "5214606",
+      "name": "NIQUELÂNDIA",
+      "state": "GO"
+    },
+    {
+      "code": "5215009",
+      "name": "NOVA VENEZA",
+      "state": "GO"
+    },
+    {
+      "code": "5215231",
+      "name": "NOVO GAMA",
+      "state": "GO"
+    },
+    {
+      "code": "5215603",
+      "name": "PADRE BERNARDO",
+      "state": "GO"
+    },
+    {
+      "code": "5217302",
+      "name": "PIRENÓPOLIS",
+      "state": "GO"
+    },
+    {
+      "code": "5217609",
+      "name": "PLANALTINA",
+      "state": "GO"
+    },
+    {
+      "code": "5219100",
+      "name": "SANTA BÁRBARA DE GOIÁS",
+      "state": "GO"
+    },
+    {
+      "code": "5219738",
+      "name": "SANTO ANTÔNIO DE GOIÁS",
+      "state": "GO"
+    },
+    {
+      "code": "5219753",
+      "name": "SANTO ANTÔNIO DO DESCOBERTO",
+      "state": "GO"
+    },
+    {
+      "code": "5220009",
+      "name": "SÃO JOÃO D'ALIANÇA",
+      "state": "GO"
+    },
+    {
+      "code": "5220454",
+      "name": "SENADOR CANEDO",
+      "state": "GO"
+    },
+    {
+      "code": "5220686",
+      "name": "SIMOLÂNDIA",
+      "state": "GO"
+    },
+    {
+      "code": "5221197",
+      "name": "TEREZÓPOLIS DE GOIÁS",
+      "state": "GO"
+    },
+    {
+      "code": "5221403",
+      "name": "TRINDADE",
+      "state": "GO"
+    },
+    {
+      "code": "5221858",
+      "name": "VALPARAÍSO DE GOIÁS",
+      "state": "GO"
+    },
+    {
+      "code": "5222203",
+      "name": "VILA BOA",
+      "state": "GO"
+    },
+    {
+      "code": "5222302",
+      "name": "VILA PROPÍCIO",
+      "state": "GO"
+    },
+    {
+      "code": "5300108",
+      "name": "BRASÍLIA",
+      "state": "DF"
+    }
+  ]
+}
