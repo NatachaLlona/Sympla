@@ -144,6 +144,10 @@ def options(request):
 
 @api_endpoint(['GET'], section='demographics')
 def search(request):
+    return JsonResponse(search_data(request))
+
+
+def search_data(request, *, all_results=False):
     params = parameters(request)
     query = available_statistics(request.api_user).filter(period=str(params['source_year']))
     integration_id = request.GET.get('integration_id')
@@ -190,7 +194,7 @@ def search(request):
         'summary': {'exact_locations': sum(row['match'] == 'exact_band_match' for row in results),
             'bounded_locations': sum(row['match'] == 'bounded' for row in results),
             'incomplete_locations': sum(row['match'] == 'incomplete_coverage' for row in results)},
-        'results': results[start:start+size]}
+        'results': results if all_results else results[start:start+size]}
     if not results:
         response['empty_reason'] = 'No imported age data matches this scope. Official neighborhoods may be unavailable; districts are a separate level.'
-    return JsonResponse(response)
+    return response

@@ -1,0 +1,2 @@
+# Used only to reproduce the bundled official cartography; no production dependency.
+pyshp==2.3.1

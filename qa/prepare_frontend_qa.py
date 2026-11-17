@@ -63,6 +63,8 @@ def main():
     result = request('/api/v1/demographics/search/?integration_id='+national['id']+'&age_min=4&age_max=8&level=city', token=token)
     assert result['count'] == 430
     print('PASS: national frontend QA scope has 430 municipalities.', flush=True)
+    fixture = "from core.models import ApiUser,Integration,Event,EventAddress; a=ApiUser.objects.get(client_id='qa-client'); i=Integration.objects.filter(owner=a,provider='sympla').first(); e,_=Event.objects.get_or_create(owner=a,integration=i,external_id='map-qa-event',defaults={'name':'QA event - Sao Paulo'}); EventAddress.objects.update_or_create(event=e,defaults={'lat':'-23.55','lon':'-46.63','city':'Sao Paulo','state':'SP'}); print('Isolated map event fixture ready.')"
+    subprocess.run(['docker', 'exec', 'sympla-startup-qa-api-1', 'python', 'manage.py', 'shell', '-c', fixture], check=True)
 
 
 if __name__ == '__main__':

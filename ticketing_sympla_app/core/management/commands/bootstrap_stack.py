@@ -17,6 +17,7 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         call_command("migrate", interactive=False, verbosity=0)
+        call_command('configure_map_reference', verbosity=0)
         role = os.environ["RUNTIME_DB_USER"]
         if not re.fullmatch(r"[a-z][a-z0-9_]{2,62}", role) or role in {
             "postgres",

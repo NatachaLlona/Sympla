@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Audience map · Census intelligence</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml"><link rel="stylesheet" href="/styles.css"><link rel="stylesheet" href="/map.css">
+  <script type="module" src="/map.js"></script>
+</head>
+<body>
+  <aside class="sidebar">
+    <a class="brand" href="/"><span class="brand-symbol" aria-hidden="true">◈</span><span>Census<span class="brand-light">intelligence</span></span></a>
+    <p class="sidebar-label">WORKSPACE</p>
+    <a class="nav-item" href="/"><span aria-hidden="true">▦</span> Demographic explorer</a>
+    <a class="nav-item active" href="/map.html" aria-current="page"><span aria-hidden="true">◎</span> Audience map</a>
+    <a class="nav-item" href="/docs/" target="_blank" rel="noopener"><span aria-hidden="true">↗</span> API documentation</a>
+    <div class="sidebar-bottom"><span class="source-dot"></span><div>Official IBGE data<small>Census 2022 · Brazil</small></div></div>
+  </aside>
+  <div class="workspace">
+    <header class="topbar"><div class="breadcrumb">Population intelligence <span>/</span> <strong>Audience map</strong></div><div class="account-actions"><a class="map-mobile-link" href="/">Explorer</a><span id="connection-status" class="connection-state">Not connected</span><button id="authorize" class="button button-dark">Authorize API ↗</button><button id="disconnect" class="button button-secondary" hidden>Disconnect</button></div></header>
+    <main>
+      <section class="page-heading"><div><div class="eyebrow">GEOGRAPHIC INTELLIGENCE</div><h1>Put your audience on the map.</h1><p>Explore the census cohorts around your events, one place at a time.</p></div><span class="data-badge"><span class="source-dot"></span> IBGE cartography · 2022</span></section>
+      <div id="notice" class="notice" role="status" aria-live="polite">Authorize through Swagger to load your events and demographic sources. The map contains no simulated populations.</div>
+      <div class="map-layout">
+        <form id="map-form" class="filters" aria-label="Audience map filters">
+          <div class="filter-header"><h2>Find your audience</h2><button type="button" class="text-button" id="reset">Reset</button></div>
+          <fieldset><legend><span class="step">01</span> Event &amp; reach</legend>
+            <label>Event<select id="event"><option value="">All locations · no event</option></select></label>
+            <label>Distance from event<select id="radius" disabled><option value="">Nationwide</option><option value="25">Within 25 km</option><option value="50">Within 50 km</option><option value="100">Within 100 km</option><option value="250">Within 250 km</option><option value="500">Within 500 km</option></select></label>
+            <p class="field-help" id="event-help">Straight-line distance to each administrative seat. Event access requires events:read.</p>
+          </fieldset>
+          <fieldset><legend><span class="step">02</span> Census cohort</legend>
+            <div class="input-row"><label>From age<input id="age-min" type="number" min="0" max="130" required></label><span class="input-separator">–</span><label>To age<input id="age-max" type="number" min="0" max="130" required></label></div>
+            <label>Analysis year<input id="target-year" type="number" min="2022" required></label>
+            <p class="field-help" id="age-help"></p>
+            <label class="check-label"><input type="checkbox" id="estimate"><span>Estimate partial age bands<small>Uniform distribution within closed source bands.</small></span></label>
+          </fieldset>
+          <fieldset><legend><span class="step">03</span> Locality income</legend>
+            <label>Household responsible persons<select id="income-metric"><option value="responsible_income_mean">Mean monthly income</option><option value="responsible_income_median">Median monthly income</option></select></label>
+            <div class="input-row"><label>From BRL<input id="income-min" type="number" min="0" max="1000000000" step="0.01" placeholder="Any"></label><span class="input-separator">–</span><label>To BRL<input id="income-max" type="number" min="0" max="1000000000" step="0.01" placeholder="Any"></label></div>
+            <p class="field-help">Nominal BRL, 2022. Filters the income summary of each locality; it does not count people jointly by age and income.</p>
+          </fieldset>
+          <fieldset><legend><span class="step">04</span> Source &amp; granularity</legend>
+            <label>IBGE integration<select id="integration"><option value="">Connect to load sources</option></select></label>
+            <label>Geography level<select id="level"><option value="city">Cities / municipalities</option><option value="district">Districts</option><option value="neighborhood">Neighborhoods</option></select></label>
+            <label>State<select id="state"><option value="">All imported states</option></select></label>
+            <p class="field-help">Only locations with official coordinates can be drawn. Zoom changes the view, not the data level.</p>
+          </fieldset>
+          <button type="submit" id="apply" class="button button-primary" disabled>Update map →</button>
+        </form>
+        <section class="map-results" aria-label="Population density map">
+          <div class="map-metrics"><article><span>Mapped locations</span><strong id="mapped">—</strong></article><article><span>Reference alignment</span><strong id="alignment">2022 → 2026</strong></article><article><span>Geography level</span><strong id="granularity">Municipalities</strong></article></div>
+          <section class="map-card">
+            <header class="map-heading"><div><span class="eyebrow">AUDIENCE DISTRIBUTION</span><h2 id="map-title">Brazil · census cohort density</h2><p id="map-subtitle">Choose filters to see the imported data.</p></div><span id="result-badge" class="map-badge">Not connected</span></header>
+            <div class="map-canvas" id="map-canvas">
+              <svg id="brazil-map" viewBox="0 0 1100 950" role="img" aria-label="Interactive Brazil map. Use zoom buttons, arrow keys to pan, or select a location below." tabindex="0"><title>Brazil audience map</title><g id="map-world"><g id="state-outlines"></g><g id="map-bubbles"></g><g id="event-marker"></g></g></svg>
+              <div class="map-controls"><button type="button" id="zoom-in" aria-label="Zoom in">+</button><button type="button" id="zoom-out" aria-label="Zoom out">−</button><button type="button" id="fit-brazil" aria-label="Fit Brazil">⌂</button></div>
+              <div class="map-hint">Drag to pan · scroll to zoom · click a bubble</div>
+              <div class="map-legend"><strong id="legend-title">Aligned cohort / km²</strong><div class="legend-colors"><span class="density-0"></span><span class="density-1"></span><span class="density-2"></span><span class="density-3"></span><span class="density-4"></span></div><div class="legend-ticks"><span>&lt;1</span><span>1–5</span><span>5–25</span><span>25–100</span><span>100+</span></div><small>Bubble area: cohort count · gray: incomplete data</small></div>
+              <div class="map-attribution">IBGE · SIRGAS 2000 · simplified state outlines</div>
+            </div>
+            <div class="map-footnote" id="coverage-note">Official administrative seats anchor the bubbles. Territorial density does not describe a neighborhood around each point.</div>
+          </section>
+          <section id="location-detail" class="map-detail" hidden aria-live="polite"></section>
+          <section class="map-location-card"><div class="ranking-heading"><div><span class="eyebrow">EXPLORE THE LOCATIONS</span><h2>Largest matching census cohorts</h2><p>Choose a location to inspect its source values and density.</p></div></div><div id="location-list" class="map-location-list"><p class="field-help">Results appear after authorization.</p></div></section>
+          <section class="method-note"><span aria-hidden="true">ⓘ</span><div><strong>Census alignment, not a population forecast.</strong><p>Age groups advance by analysis year minus 2022. Births after the census, deaths and migration are not modeled. Partial bands use bounds unless an explicit estimate is enabled. Income remains a separate locality-level measure.</p></div></section>
+        </section>
+      </div>
+      <footer>IBGE Census 2022 <span>·</span> Owner-scoped event and demographic data <span>·</span> <a href="/">Open demographic explorer ↗</a></footer>
+    </main>
+  </div>
+  <dialog id="auth-dialog" class="auth-dialog"><div class="dialog-heading"><div><h2>Authorize through Swagger</h2><p>Use your existing API client ID and secret in Authorize.</p></div><button id="close-auth" class="icon-button" aria-label="Close authorization">×</button></div><iframe id="auth-frame" title="Swagger API authorization" sandbox="allow-scripts allow-same-origin allow-forms"></iframe></dialog>
+</body>
+</html>

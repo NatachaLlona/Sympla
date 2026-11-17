@@ -34,6 +34,11 @@ def geography_for(data, cache):
         if not created and location.parent_id != (parent.pk if parent else None):
             raise SyncError('ibge_invalid_response')
         cache[key] = location
+        from .map_reference import reference_data
+        from .models import GeographyMapReference
+        spatial = reference_data(location)
+        if spatial:
+            GeographyMapReference.objects.get_or_create(geography=location, defaults=spatial)
     return cache[key]
 
 

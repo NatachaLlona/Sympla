@@ -282,6 +282,22 @@ class Geography(models.Model):
         constraints = [models.UniqueConstraint(fields=['code', 'level', 'reference_year'], name='unique_geography_reference')]
 
 
+class GeographyMapReference(models.Model):
+    geography = models.OneToOneField(Geography, on_delete=models.PROTECT, related_name='map_reference')
+    latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True)
+    longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True)
+    area_km2 = models.DecimalField(max_digits=18, decimal_places=6, null=True)
+    coordinate_kind = models.CharField(max_length=40, blank=True)
+    reference_year = models.PositiveSmallIntegerField(default=2022)
+    provenance = models.JSONField(default=dict)
+
+    class Meta:
+        constraints = [
+            models.CheckConstraint(condition=models.Q(latitude__isnull=True, longitude__isnull=True) | models.Q(latitude__isnull=False, longitude__isnull=False, latitude__gte=-90, latitude__lte=90, longitude__gte=-180, longitude__lte=180), name='valid_map_coordinates'),
+            models.CheckConstraint(condition=models.Q(area_km2__isnull=True) | models.Q(area_km2__gt=0), name='positive_map_area'),
+        ]
+
+
 class StatisticalIndicator(models.Model):
     code = models.CharField(max_length=80, primary_key=True)
     name = models.CharField(max_length=200)

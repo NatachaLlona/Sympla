@@ -6,8 +6,10 @@ from . import identity
 from . import integrations, event_views
 from . import statistics_views
 from . import cohort_search
+from . import map_views
 
 urlpatterns = [
+    path('api/v1/demographics/map/', map_views.map_data),
     path('api/v1/demographics/explorer-options/', cohort_search.options),
     path('api/v1/demographics/search/', cohort_search.search),
     path('api/v1/geographies/', statistics_views.geographies),

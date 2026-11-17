@@ -1,5 +1,9 @@
 # Sympla Integration
 
+Interactive [audience map](docs/audience-map.md): `http://127.0.0.1:8011/map.html`.
+Filter owned events, age cohorts and locality income, then inspect official IBGE density bubbles
+with zoom, source provenance and explicit geography coverage.
+
 A relational business database fed by integrations, intended to support reports and sales insights
 for people and AI systems. Implemented domains are Sympla events and IBGE Census 2022 population, age and income statistics, collected through
 daily or on-demand integration jobs. File uploads, sales entities and report generation are future work.

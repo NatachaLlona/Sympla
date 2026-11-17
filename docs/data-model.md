@@ -372,3 +372,24 @@ Statistic is unique by integration, geography, category and period. Version is u
 version number; observation by statistic and run; source by run and source code. Statistical versions,
 observations, source artifacts and coverage evidence are append-only. Geography metadata is shared,
 while values and lineage are scoped through the owning integration. See [IBGE semantics and coverage](ibge-integration.md).
+
+## Map spatial references
+
+```mermaid
+erDiagram
+    GEOGRAPHY ||--o| GEOGRAPHY_MAP_REFERENCE : locates
+    GEOGRAPHY_MAP_REFERENCE {
+        bigint id PK
+        bigint geography_id FK,UK
+        decimal latitude "Nullable, paired with longitude"
+        decimal longitude "Official administrative seat"
+        decimal area_km2 "Nullable, positive territorial area"
+        string coordinate_kind
+        integer reference_year
+        json provenance "Official coordinate and area URLs plus SHA-256"
+    }
+```
+
+Spatial metadata is shared by geography, level and reference year. Owned statistical values remain
+in `STATISTIC`; the read-only [audience map](audience-map.md) joins them without copying or rewriting
+observations. Paired-coordinate and positive-area constraints apply at database level.

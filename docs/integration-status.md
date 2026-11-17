@@ -2,6 +2,11 @@
 
 ## Demographic frontend
 
+The separate [audience map page](audience-map.md) adds offline IBGE state outlines, municipal density
+bubbles, event proximity and locality income filters. Spatial references are relational and provenance
+is retained; age/income joint distributions are not inferred. Validation passed 116 PostgreSQL tests
+and isolated browser checks with 430 municipalities.
+
 National scope added: 430 municipalities covering the 27 capitals and their official metropolitan
 regions/RIDEs, based on corrected IBGE composition 2025. Municipal demographic measurements retain
 reference year 2022. The local import created 6,450 observations without missing values, while retaining
