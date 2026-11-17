@@ -28,6 +28,22 @@ x-app: &app
   restart: unless-stopped
 
 services:
+  audience-map:
+    build: {context: ., dockerfile: audience-map/Dockerfile}
+    image: ${COMPOSE_PROJECT_NAME:-sympla}-audience-map
+    ports: ['127.0.0.1:${AUDIENCE_MAP_PORT:-8012}:8080']
+    depends_on:
+      api: {condition: service_healthy}
+    read_only: true
+    tmpfs: [/tmp]
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+    restart: unless-stopped
+    healthcheck:
+      test: [CMD, wget, -q, --spider, http://127.0.0.1:8080/health]
+      interval: 5s
+      timeout: 5s
+      retries: 12
   frontend:
     build: ./frontend
     image: ${COMPOSE_PROJECT_NAME:-sympla}-frontend

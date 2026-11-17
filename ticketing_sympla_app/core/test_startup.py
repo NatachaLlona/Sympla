@@ -28,6 +28,7 @@ class StartupTests(SimpleTestCase):
         self.assertEqual(config["database"], {"name": "Simpla", "port": 2424})
         self.assertEqual(config["api"]["port"], 8010)
         self.assertEqual(config['frontend']['port'], 8011)
+        self.assertEqual(config['audience_map']['port'], 8012)
 
     def test_frontend_port_is_optional_for_legacy_configs_and_must_be_distinct(self):
         config = {'database': {'name': 'Simpla', 'port': 2424}, 'api': {'port': 8010},
@@ -49,3 +50,12 @@ class StartupTests(SimpleTestCase):
         self.assertIn("Invalid password.", messages)
         self.assertIn("8 to 16 characters", messages)
         self.assertIn("uppercase", messages)
+
+    def test_map_port_defaults_for_upgrades_and_rejects_conflicts(self):
+        config = {'database': {'name': 'Simpla', 'port': 2424}, 'api': {'port': 8010},
+                  'auth': {'token_ttl_seconds': 3600}, 'docker': {'project_name': 'sympla'}}
+        with patch.object(launcher, 'read_jsonc', return_value=config):
+            self.assertEqual(launcher.load_config('fixture')['audience_map']['port'], 8012)
+        config['audience_map']['port'] = 8011
+        with patch.object(launcher, 'read_jsonc', return_value=config), self.assertRaises(launcher.StartupError):
+            launcher.load_config('fixture')

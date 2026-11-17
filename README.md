@@ -1,6 +1,6 @@
 # Sympla Integration
 
-Interactive [audience map](docs/audience-map.md): `http://127.0.0.1:8011/map.html`.
+Independent [audience map module](docs/audience-map.md): `http://127.0.0.1:8012/map/`.
 Filter owned events, age cohorts and locality income, then inspect official IBGE density bubbles
 with zoom, source provenance and explicit geography coverage.
 

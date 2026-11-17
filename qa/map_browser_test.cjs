@@ -8,7 +8,7 @@ const fs = require('node:fs');
   page.on('pageerror', error => errors.push(error.message));
   page.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
   try {
-    await page.goto('http://localhost:8080/map.html', {waitUntil: 'networkidle'});
+    await page.goto('http://localhost:8080/map/', {waitUntil: 'networkidle'});
     await page.locator('.state-outline').first().waitFor();
     assert.equal(await page.locator('.state-outline').count(), 27);
     assert.equal(await page.locator('.map-bubble').count(), 0);

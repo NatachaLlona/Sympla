@@ -1,7 +1,9 @@
 # Audience map
 
-Open `http://127.0.0.1:8011/map.html`, or choose **Audience map** from the demographic explorer.
-This is a separate page in the existing frontend container. It uses the same API, PostgreSQL database,
+Open `http://127.0.0.1:8012/map/`, or choose **Audience map** from the demographic explorer.
+The independent `audience-map` module has its own directory, Dockerfile, Nginx server, image,
+container, health check and configurable port (`audience_map.port`, default 8012). `start.py` builds
+and starts it alongside the other modules. It shares the authenticated API and PostgreSQL database,
 permissions and Swagger Authorize flow. Navigation to a new page requires authorization again; Bearer
 tokens stay in page memory and are cleared on disconnect, expiry or reload. No credential form or
 browser-native HTTP Basic challenge was added.
@@ -80,4 +82,12 @@ browser tests is an explicitly named fixture in the disposable QA stack; product
 
 After `python qa/prepare_frontend_qa.py`, build `qa/browser.Dockerfile` and run its image with
 `--network container:sympla-startup-qa-frontend-1`, mounting an artifacts directory at `/artifacts`,
-and command `node /qa/map-test.cjs`.
+and command `node /qa/map-test.cjs`. Run once through the explorer's proxy and once with
+`--network container:sympla-startup-qa-audience-map-1` to verify both entry points.
+
+The explorer forwards `/map/` to the independent map container and redirects the older `/map.html`
+link there. On the map container, `/` redirects to `/map/`; `/explorer/` provides navigation back to
+the explorer. Map assets are served only from `/map/`. Shared typography/CSS primitives and favicon
+are copied into the map image at build time. The map page and its API authorization work without the
+explorer container; only navigation to the explorer needs that service. No database/provider secrets
+are mounted in either frontend module.

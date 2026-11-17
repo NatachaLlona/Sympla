@@ -44,7 +44,7 @@ $('brazil-map').addEventListener('keydown', event => {
   event.preventDefault();
 });
 async function outlines() {
-  const response = await fetch('/data/brazil-states-2022.geojson', {credentials: 'omit'});
+  const response = await fetch('/map/data/brazil-states-2022.geojson', {credentials: 'omit'});
   if (!response.ok) throw new Error('The bundled Brazil outline is unavailable.');
   const data = await response.json(), all = [];
   for (const feature of data.features) {

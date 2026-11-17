@@ -18,6 +18,7 @@ def main():
     assert config['docker']['project_name'] == 'sympla-startup-qa'
     assert config['database']['name'] == 'SimplaQA' and config['api']['port'] == 18010
     config['frontend'] = {'port': 18011}
+    config['audience_map'] = {'port': 18012}
     config['auth']['token_ttl_seconds'] = 3600
     path.write_text(json.dumps(config), encoding='utf-8')
     assert launcher.main(['--config', str(path), '--state-dir', str(ROOT/'.qa-local/state')]) == 0

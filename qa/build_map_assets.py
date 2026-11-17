@@ -107,7 +107,7 @@ def main():
             entry = coordinates.setdefault(key, {})
             area = row.get('AREA_KM2', '').replace(',', '.')
             entry['area_km2'] = float(area) if area and float(area) > 0 else None
-    public = ROOT/'frontend/public/data'
+    public = ROOT/'audience-map/public/data'
     public.mkdir(exist_ok=True)
     (public/'brazil-states-2022.geojson').write_text(json.dumps({'type': 'FeatureCollection', 'source': states_source, 'features': features}, ensure_ascii=False, separators=(',', ':')), encoding='utf-8')
     target = ROOT/'ticketing_sympla_app/core/integration_modules/ibge/map_reference_2022.json'

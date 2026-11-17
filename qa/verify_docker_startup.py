@@ -26,6 +26,7 @@ def main():
                 "database": {"name": "SimplaQA", "port": 25424},
                 "api": {"port": 18010},
                 "frontend": {"port": 18011},
+                "audience_map": {"port": 18012},
                 "auth": {"token_ttl_seconds": 120},
                 "docker": {"project_name": "sympla-startup-qa"},
             }
@@ -214,6 +215,11 @@ print('Runtime database role privileges verified.')
 """
     subprocess.run(['docker', 'exec', 'sympla-startup-qa-api-1', 'python', 'manage.py', 'shell', '-c', permission_check], check=True)
     frontend = 'http://127.0.0.1:18011'
+    with urlopen('http://127.0.0.1:18012/map/', timeout=10) as response:
+        assert b'Put your audience on the map.' in response.read()
+    with urlopen(frontend+'/map.html', timeout=10) as response:
+        assert response.geturl().endswith('/map/')
+        assert b'Put your audience on the map.' in response.read()
     with urlopen(frontend+'/', timeout=10) as response:
         assert 'Demographic explorer' in response.read().decode()
         assert "script-src 'self'" in response.headers['Content-Security-Policy']
