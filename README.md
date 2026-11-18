@@ -1,21 +1,68 @@
-# Sympla Integration
+# Event and Demographic Intelligence
 
-Independent [audience map module](docs/audience-map.md): `http://127.0.0.1:8012/map/`.
-The [analysis workspace](docs/analysis-workspace.md) is available at `http://127.0.0.1:8012/map/workspace.html`:
-sales CSV uploads, saved scenarios, comparisons, reports, quality and local source-update alerts.
-Filter owned events, age cohorts and locality income, then inspect official IBGE density bubbles
-with zoom, source provenance and explicit geography coverage.
+A relational business database fed by modular integrations and sales-file uploads. It combines
+Sympla events, IBGE Census 2022 demographics and versioned sales evidence to support reports and
+business insights for people and AI systems.
 
-A relational business database fed by integrations, intended to support reports and sales insights
-for people and AI systems. Implemented domains are Sympla events and IBGE Census 2022 population, age and income statistics, collected through
-daily or on-demand integration jobs. File uploads, sales entities and report generation are future work.
+## Open the application
 
-## Modular integration containers
+Start the local stack with `python start.py`, then open:
 
-Sympla and IBGE run in separate Docker services and images: `integration-sympla` and `integration-ibge`.
-The PostgreSQL relational database and authenticated API are shared. Start all services with `python start.py`.
-See [IBGE configuration, supported geography levels and coverage](docs/ibge-integration.md) for the
-São Paulo/SP example, official indicators, query endpoints and honest neighborhood/district distinctions.
+| Interface | Local URL | Purpose |
+| --- | --- | --- |
+| Demographic explorer | [Open explorer](http://127.0.0.1:8011/) | Age-cohort rankings, source coverage and CSV export |
+| Audience map | [Open map](http://127.0.0.1:8012/map/) | Zoom, clusters, event/venue reach and demographic filters |
+| Analysis workspace | [Open workspace](http://127.0.0.1:8012/map/workspace.html) | Sales uploads, scenarios, comparisons, notes, reports and alerts |
+| Swagger | [Open API documentation](http://127.0.0.1:8010/docs/) | Authorize with API client credentials and test endpoints |
+
+Use **Authorize API** in the frontend or **Authorize** in Swagger with the API client ID and secret
+chosen during startup. API credentials are entered only through Swagger; no browser-native Basic
+sign-in dialog is used. Tokens remain in page memory, so a new page or reload requires authorization.
+
+## Modules and delivered capabilities
+
+| Docker service | Responsibility |
+| --- | --- |
+| `db` | Shared PostgreSQL 17/PostGIS 3.7 relational database and persistent history |
+| `api` | Bearer authentication, scoped permissions, integration CRUD and data APIs |
+| `integration-sympla` | Independent scheduled/on-demand Sympla event collection |
+| `integration-ibge` | Independent IBGE population, age and income collection |
+| `frontend` | Demographic explorer, source evidence and CSV export |
+| `audience-map` | Separate map/workspace module, image, server, health check and port |
+| `analysis-monitor` | Local, deduplicated source-update alerts for watched scenarios |
+| `routing` | Optional local OSRM car-routing engine; no public host port |
+
+The map supports viewport queries, zoom-dependent grouping and distinct count/share/density displays.
+Sales CSV uploads preserve file hashes and append correction versions. Saved scenarios retain filters,
+source versions and immutable captures; compare captures or export standalone HTML reports with a map
+and complete JSON evidence. Commercial notes and quality views are available in the workspace.
+
+The national IBGE preset contains **430 municipalities**, covering the 27 capitals, including Brasilia,
+and their official metropolitan regions/RIDEs. The detailed Sao Paulo source remains separate.
+Geography composition is based on corrected IBGE 2025 data; demographic measurements retain reference
+period **2022**. The calendar-year age shift does not model births after the census, mortality or migration.
+
+Income filters use locality mean/median monthly income of household responsible persons with income,
+in nominal BRL 2022. They do not identify people jointly satisfying an individual age/income bracket.
+Sales-based insights require actual uploaded files; absence of uploaded records does not prove zero
+sales or demand. No synthetic sales are inserted into the main environment.
+
+Road-time filtering currently has a prepared **Rio de Janeiro regional extract**, not national coverage.
+Times use a car profile without live traffic, parking or transit schedules. Uncovered/unroutable
+locations remain unknown. Larger extracts require additional preprocessing resources; see routing setup below.
+
+Documentation:
+
+- [IBGE scope, indicators and import configuration](docs/ibge-integration.md)
+- [Demographic explorer and cohort calculations](docs/demographic-frontend.md)
+- [Independent audience map module](docs/audience-map.md)
+- [Sales CSV format, analysis workflows, permissions and routing](docs/analysis-workspace.md)
+- [Entity-relationship diagrams](docs/data-model.md), [program flowcharts](docs/import-flow.md)
+- [Delivery status and validation](docs/integration-status.md)
+
+Validation includes **130 PostgreSQL/PostGIS tests**, real-browser map/workspace flows and a local road
+query. A local 430-municipality benchmark measured warm median computation of approximately 202 ms
+before optimization and 36 ms with caching (about 82% lower latency in that test, not a production SLA).
 
 ## Relational events, integration CRUD and lineage
 
@@ -55,7 +102,7 @@ Example integration creation:
 {"name":"Event source","provider":"sympla","active":true,"is_default":false}
 ```
 
-PATCH accepts name, active and is_default. Provider and owner are immutable. DELETE soft-deletes
+PATCH accepts name, active, is_default and provider-validated configuration. Provider and owner are immutable. DELETE soft-deletes
 configuration, deactivates its schedules and cancels queued imports; existing events, versions and
 lineage remain readable. Changing a configuration during collection prevents that result from committing.
 Selecting a default does not rewrite existing schedules. Reactivating an integration preserves its
@@ -64,8 +111,9 @@ original schedules; schedules disabled by deletion cannot be restored by undelet
 Each API account receives a default Sympla integration. Sympla credentials remain encrypted and scoped
 to the API account: multiple Sympla integrations for the same API account use that account's token,
 not separate Sympla credentials. No arbitrary upstream URLs or dynamic code imports are accepted.
-Future connectors implement configuration_error, collect and normalize through the explicit registry
-in core/connectors.py; they reuse the same transactional persistence, versioning and lineage pipeline.
+Connectors implement validated configuration, configuration_error and collect through the explicit
+registry in core/connectors.py. Domain-specific normalization/persistence preserves atomic imports,
+versioning and lineage; API input cannot select arbitrary code or upstream URLs.
 The production registry contains Sympla event and IBGE statistical connectors.
 
 Schedule creation and POST `/api/v1/sync/` accept an optional integration_id. Omission selects the
@@ -98,7 +146,7 @@ The [demographic frontend](docs/demographic-frontend.md) runs in its own contain
 calculation bounds and provenance, and export CSV. Ages are aligned by the calendar-year difference
 from the source census; this does not model births, deaths or migration.
 
-Requirements: Python 3.10+ on the host and Docker Desktop/Engine with Linux containers and Docker Compose v2.
+Requirements: Python 3.11+ on the host (including local routing preparation) and Docker Desktop/Engine with Linux containers and Docker Compose v2.
 The API and integration containers run on Python 3.13 in Docker. A host virtual environment is not required.
 
 ```powershell
@@ -113,8 +161,9 @@ Sympla provider token. Password input is hidden and confirmation is required. In
 the rules and prompt again: **8 to 16 characters, uppercase, lowercase, digit and special character**;
 printable ASCII only, no spaces. Database credentials and API credentials are separate.
 
-The launcher builds the image, starts PostgreSQL, applies migrations, creates a restricted runtime
-DB role and the initial write-enabled API client, then starts the API and worker. Subsequent launches
+The launcher builds the module images, starts PostgreSQL/PostGIS, applies migrations, configures a
+restricted runtime database role and the protected master API account, then starts the API, provider
+workers, frontend modules and analysis monitor. A prepared routing graph starts when enabled. Subsequent launches
 reuse credentials and persistent data. You may close the terminal after the Ready message.
 
 Swagger: **http://127.0.0.1:8010/docs/** (also /swagger/).
@@ -128,13 +177,16 @@ Edit config.jsonc before first launch. Comments and trailing commas are supporte
   "database": { "name": "Simpla", "port": 2424 },
   "api": { "port": 8010 },
   "frontend": { "port": 8011 },
+  "audience_map": { "port": 8012 },
+  "routing": { "enabled": true, "region": "rio-de-janeiro" },
   "auth": { "token_ttl_seconds": 3600 },
   "docker": { "project_name": "sympla" }
 }
 ```
 
 PostgreSQL is published on host port 2424; containers connect to db:5432 internally.
-Both PostgreSQL and the API bind only to 127.0.0.1. Port changes apply on the next launch.
+PostgreSQL, the API and both frontend entry points bind only to 127.0.0.1. Ports must be distinct;
+changes apply on the next launch. OSRM is internal to the Docker network.
 Changing the database name/project after initialization is blocked: start.py never silently renames,
 replaces or deletes existing databases. Plan an explicit migration or a separate new instance instead.
 
@@ -152,11 +204,41 @@ python start.py --check
 python start.py --logs
 python start.py --stop
 python start.py --reset-api-client
+python start.py --prepare-routing
 ```
 
 Stop preserves database volumes. Reset prompts for a new API client secret and invalidates existing
 tokens. The launcher never deletes volumes automatically. Use --config PATH --state-dir PATH with
 a distinct Docker project and ports to isolate another instance.
+
+## Sales upload and local routing setup
+
+In the analysis workspace, select an owned event and edition, download the CSV template and upload
+UTF-8 data with these columns, in this order:
+
+```csv
+sale_id,sold_on,municipality_code,tickets,revenue
+order-line-001,2026-11-01,3550308,2,120.00
+```
+
+The municipality is the declared ticket/buyer-origin IBGE code, not the venue location. Limits are
+5 MiB and 10000 rows. Dates use YYYY-MM-DD; revenue is a nonnegative BRL line total with a decimal point.
+Blank origins are allowed and remain unresolved. Do not upload names, emails or personal profiles.
+Re-uploading the same file is idempotent; corrections to an event/edition/sale ID append a version.
+Omitted rows are retained. See the [full CSV contract](docs/analysis-workspace.md#sales-csv).
+
+For road-time filtering on a new machine, choose the routing region in config.jsonc and run:
+
+```powershell
+python start.py --prepare-routing
+```
+
+The default regional graph is Rio de Janeiro. Supported larger extracts are `sudeste` and `brazil`;
+the compressed files are approximately 823 MB and 2 GB, with substantially larger preprocessing RAM
+requirements. National preparation is unsuitable for the current 8 GiB Docker allocation. Increase
+resources before choosing it. Existing graphs are reused; no graph is silently downloaded at normal
+startup. Missing graphs do not block demographic exploration, but cannot provide road-time results.
+Graph files live under routing/data/, excluded from Git and Docker builds, and contain no API credentials.
 
 ## Authentication and Swagger
 
@@ -190,7 +272,7 @@ minute per source IP; follow Retry-After on 429. Client rotation/revocation inva
 Old non-expiring static tokens are no longer accepted. Only password hashes and token digests are stored;
 API logs never record token request/response bodies or authorization headers.
 
-The first client is write-enabled. Operators can provision additional clients with the administrative
+The first API account is the single protected master. Operators can provision additional clients with the administrative
 management command api_user create CLIENT_ID (read-only) or api_user create CLIENT_ID --write, or
 rotate/revoke existing clients. Those commands require the migration-owner database connection.
 There is no anonymous client-registration endpoint.
@@ -216,6 +298,19 @@ the corresponding section:action permission. Lists accept page and page_size (1 
 | GET | /api/v1/events/{id}/versions/ | Read versions and field differences |
 | GET | /api/v1/audit-logs/ | Read changes; filters: resource, target_id, actor |
 | GET | /api/v1/request-logs/ | Read access history, including denied attempts |
+| GET | /api/v1/demographics/ | Read owned IBGE statistics and their reference periods |
+| GET | /api/v1/demographics/map/ | Filter map cohorts, locality income, venue reach and road time |
+| GET/POST | /api/v1/sales/uploads/ | Inspect import provenance or upload a versioned sales CSV |
+| GET | /api/v1/sales/summary/ | Read recorded origins and compare event editions |
+| GET/POST | /api/v1/analysis/scenarios/ | List scenarios or save filters with an immutable capture |
+| GET/PATCH/DELETE | /api/v1/analysis/scenarios/{id}/ | Inspect, revise or archive an owned scenario |
+| GET/POST | /api/v1/analysis/scenarios/{id}/snapshots/ | List or capture reproducible analysis evidence |
+| GET | /api/v1/analysis/scenarios/{id}/report/ | Export captured JSON or standalone HTML with a map |
+| GET | /api/v1/analysis/scenarios/{id}/opportunities/ | Compare a cohort scenario with uploaded municipal tickets |
+| GET | /api/v1/analysis/compare/ | Compare 2–5 scenario snapshots |
+| GET/POST | /api/v1/analysis/notes/ | Read or create commercial annotations |
+| GET | /api/v1/analysis/alerts/ | Read local source-update alerts |
+| GET | /api/v1/analysis/quality/ | Inspect source freshness, missing data and recent imports |
 
 Schedule example: {"time":"09:30","timezone":"Europe/Lisbon","active":true}.
 Each recurs daily in its explicit IANA zone. Confirmed means active. Maximum 100 nondeleted schedules;
@@ -224,9 +319,11 @@ jobs finish. /ping/ is public process liveness. The unsafe legacy /update/ route
 
 ## Synchronization and recovery
 
-The worker runs automatically in Docker, checking schedules every five seconds between imports.
+The Sympla and IBGE workers run automatically in separate containers, each checking its provider
+schedules every five seconds between imports.
 Manual jobs require no schedule and may queue behind scheduled jobs; a second unfinished manual job
-returns 409. A global running slot prevents concurrent imports. After downtime, one overdue occurrence
+returns 409 for that integration. Provider-specific running slots prevent overlapping imports within
+the same provider while allowing Sympla and IBGE collection to run independently. After downtime, one overdue occurrence
 per schedule is queued; missed days are coalesced. DST gaps are skipped; ambiguous times run once.
 
 Every upstream page is validated before an atomic database import. New events start at version 1;
@@ -234,7 +331,8 @@ identical documented data creates no version. Changes preserve snapshots and bef
 values with JSON Pointer paths. Events absent from later responses are retained: absence does not
 prove deletion or cancellation. Current events use allowlisted JSON fields and string external IDs.
 The original SQL file is historical design material; Django migrations are the implemented schema.
-There is no ticket sale, payment processing or attendee ingestion.
+Sales records are imported through the separate CSV upload API. Ticket checkout, payment processing
+and automatic attendee ingestion are not implemented.
 
 If a worker is interrupted during a run, its running slot remains held. Stop and verify all workers,
 then use recover_sync RUN_UUID --workers-stopped with an administrative connection before restarting.
@@ -262,7 +360,7 @@ See VALIDATION.md. A real authorized Sympla staging import remains required befo
 
 A 202 response with status queued means only that a job was accepted, not that events were imported.
 The manual response includes status_url. Follow GET /api/v1/sync-runs/{run_id}/ until status becomes
-success or failed. GET /api/v1/sync-runs/ lists all scheduled and manual runs. Failures include
+success, partial or failed. GET /api/v1/sync-runs/ lists all scheduled and manual runs. Failures include
 error_code and error_details with an English message and, for upstream HTTP errors, the status/page.
 Upstream bodies, authorization headers and pagination cursors are never included in these diagnostics.
 
@@ -279,7 +377,10 @@ python start.py --logs
 Direct Docker commands are also available:
 
 ```powershell
-docker logs --tail 100 -f sympla-worker-1
+docker logs --tail 100 -f sympla-integration-sympla-1
+docker logs --tail 100 -f sympla-integration-ibge-1
+docker logs --tail 100 -f sympla-analysis-monitor-1
+docker logs --tail 100 -f sympla-routing-1
 docker logs --tail 100 -f sympla-api-1
 ```
 
@@ -334,6 +435,9 @@ delete them without the corresponding grants. The same applies to custom roles a
 | synchronization | Manual imports and synchronization runs |
 | events | Imported events and immutable versions |
 | audit | Audit and HTTP request logs |
+| sales | Owned CSV uploads, sales summaries and opportunity evidence |
+| scenarios | Saved scenarios, immutable captures, commercial notes and local alerts |
+| reports | Historical report exports and scenario comparisons |
 
 GET /permissions returns each code with its section, action and description. The catalogue contains
 four actions per section; actions without a matching endpoint do not grant additional behavior.
