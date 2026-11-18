@@ -7,4 +7,5 @@
 **/*.pyc
 .local
 .qa-local
+routing/data
 *.log

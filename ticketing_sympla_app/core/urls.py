@@ -7,8 +7,21 @@ from . import integrations, event_views
 from . import statistics_views
 from . import cohort_search
 from . import map_views
+from . import analysis_views
 
 urlpatterns = [
+    path('api/v1/sales/uploads/', analysis_views.uploads),
+    path('api/v1/sales/summary/', analysis_views.sales_summary),
+    path('api/v1/analysis/scenarios/', analysis_views.scenarios),
+    path('api/v1/analysis/scenarios/<int:pk>/', analysis_views.scenario_detail),
+    path('api/v1/analysis/scenarios/<int:pk>/snapshots/', analysis_views.snapshots),
+    path('api/v1/analysis/scenarios/<int:pk>/report/', analysis_views.report),
+    path('api/v1/analysis/scenarios/<int:pk>/opportunities/', analysis_views.opportunities),
+    path('api/v1/analysis/notes/', analysis_views.notes),
+    path('api/v1/analysis/alerts/', analysis_views.alerts),
+    path('api/v1/analysis/alerts/<int:pk>/', analysis_views.acknowledge_alert),
+    path('api/v1/analysis/quality/', analysis_views.quality),
+    path('api/v1/analysis/compare/', analysis_views.compare),
     path('api/v1/demographics/map/', map_views.map_data),
     path('api/v1/demographics/explorer-options/', cohort_search.options),
     path('api/v1/demographics/search/', cohort_search.search),

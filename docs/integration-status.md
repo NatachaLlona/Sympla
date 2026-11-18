@@ -1,5 +1,14 @@
 # Integration delivery status
 
+## Analysis workspace and optimization
+
+[Delivered analysis capabilities and measured performance](analysis-workspace.md) cover bounded
+owner-scoped caching, viewport queries, clustering, PostGIS indexes, CSV sales ingestion with immutable
+correction versions, scenarios/snapshots/comparisons, local notes and alerts, standalone map reports and
+quality evidence. The separate OSRM module has a verified Rio regional graph; national routing coverage
+is not claimed on the current 8 GiB Docker allocation. Exact individual age/income distributions remain
+a source-data prerequisite. Validation: 130 PostgreSQL/PostGIS tests and real-browser flows.
+
 ## Demographic frontend
 
 The separate [audience map page](audience-map.md) adds offline IBGE state outlines, municipal density

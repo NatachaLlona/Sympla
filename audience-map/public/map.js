@@ -4,6 +4,43 @@ const format = value => value === null || value === undefined ? 'Unavailable' : 
 const levelNames = {city: 'Municipalities', district: 'Districts', neighborhood: 'Neighborhoods'};
 const state = {options: null, events: [], geographies: [], points: [], result: null, serial: 0, busy: false};
 let scale = 1, tx = 0, ty = 0, bounds = null, drag = null, moved = false;
+let viewportTimer;
+function currentBbox() {
+  const inverse = (x, y) => [(x-30)/20-75, (2*Math.atan(Math.exp(Math.log(Math.tan(Math.PI/4+6*Math.PI/360))-(y-40)/20*Math.PI/180))-Math.PI/2)*180/Math.PI];
+  const a = inverse(-tx/scale,-ty/scale), b = inverse((1100-tx)/scale,(950-ty)/scale);
+  return [Math.max(-180,a[0]),Math.max(-85,b[1]),Math.min(180,b[0]),Math.min(85,a[1])].join(',');
+}
+function scheduleViewport() { clearTimeout(viewportTimer); if ($('viewport').checked && state.result) viewportTimer = setTimeout(() => search(true), 450); }
+function renderBubbles() {
+  const selectedMetric=$('color-metric').value;
+  $('legend-title').textContent=selectedMetric==='sales'?'Uploaded tickets · gray: no record':(state.result?.query.estimate?'Estimated ':'Confirmed lower-bound ')+(selectedMetric==='count'?'cohort count':selectedMetric==='share'?'cohort share · %':'cohort / km²');
+  const ticks=selectedMetric==='sales'?['0–9','10–49','50–199','200–999','1000+']:selectedMetric==='count'?['<1k','1–10k','10–50k','50–100k','100k+']:selectedMetric==='share'?['<1%','1–3%','3–5%','5–10%','10%+']:['<1','1–5','5–25','25–100','100+'];
+  [...document.querySelectorAll('.legend-ticks span')].forEach((item,index)=>item.textContent=ticks[index]);
+  const container = $('map-bubbles'); container.replaceChildren();
+  if (!state.points.length) return;
+  const groups = new Map(), cluster = $('cluster').checked;
+  for (const row of state.points) {
+    const p = project(row.longitude,row.latitude), key = cluster ? `${Math.floor((p[0]*scale+tx)/48)}:${Math.floor((p[1]*scale+ty)/48)}` : row.geography.code;
+    if (!groups.has(key)) groups.set(key, []); groups.get(key).push(row);
+  }
+  const maxCount = Math.max(1,...[...groups.values()].map(rows=>rows.reduce((sum,row)=>sum+count(row),0)));
+  for (const rows of groups.values()) {
+    const points = rows.map(row=>project(row.longitude,row.latitude));
+    const total = rows.reduce((sum,row)=>sum+count(row),0), area = rows.reduce((sum,row)=>sum+(row.area_km2||0),0);
+    const metric=$('color-metric').value, population=rows.reduce((sum,row)=>sum+(row.source_age_total||0),0);
+    const unknown = rows.some(row=>row.match==='incomplete_coverage'||(metric==='density'&&!row.area_km2)||(metric==='share'&&!row.source_age_total)||(metric==='sales'&&state.sales?.[row.geography.code]===undefined));
+    const confirmed=rows.reduce((sum,row)=>sum+(row.estimated_count!==null?row.estimated_count:row.lower_bound),0);
+    const value = unknown ? null : metric==='sales'?rows.reduce((sum,row)=>sum+Number(state.sales?.[row.geography.code]||0),0):metric==='count'?confirmed:metric==='share'?confirmed/population*100:confirmed/area;
+    const radius = Math.max(4,Math.sqrt(total/maxCount)*27), cx = points.reduce((sum,p)=>sum+p[0],0)/points.length, cy=points.reduce((sum,p)=>sum+p[1],0)/points.length;
+    const node = svg('circle',{cx,cy,r:radius/scale,class:`map-bubble ${rows.length>1?'map-cluster ':''}${densityClass(value)}`,tabindex:'0',role:'button'});
+    const label = rows.length>1 ? `${rows.length} locations · cohort ${format(total)} · ${metric} ${format(value)}. Select to zoom.` : `${rows[0].geography.name}: cohort ${interval(rows[0].lower_bound,rows[0].upper_bound)}`;
+    node.setAttribute('aria-label',label); node.dataset.radius=radius;
+    const title=svg('title'); title.textContent=label; node.append(title);
+    const choose=()=>{ if(rows.length===1) details(rows[0]); else {fit([Math.min(...points.map(p=>p[0])),Math.min(...points.map(p=>p[1])),Math.max(...points.map(p=>p[0])),Math.max(...points.map(p=>p[1]))],160);scheduleViewport();} };
+    node.addEventListener('click',()=>{if(!moved) choose();}); node.addEventListener('keydown',event=>{if(['Enter',' '].includes(event.key)){event.preventDefault();choose();}});
+    container.append(node);
+  }
+}
 function element(tag, text, cls) { const node = document.createElement(tag); if (text !== undefined) node.textContent = text; if (cls) node.className = cls; return node; }
 function svg(tag, attrs = {}) { const node = document.createElementNS(NS, tag); for (const [key, value] of Object.entries(attrs)) node.setAttribute(key, value); return node; }
 function message(text, error = false) { $('notice').textContent = text; $('notice').className = error ? 'notice error' : 'notice success'; }
@@ -15,12 +52,12 @@ function options(id, rows, empty) {
 function project(lon, lat) { return [(Number(lon)+75)*20+30, (Math.log(Math.tan(Math.PI/4+6*Math.PI/360))-Math.log(Math.tan(Math.PI/4+Number(lat)*Math.PI/360)))*20*180/Math.PI+40]; }
 function transform() {
   $('map-world').setAttribute('transform', `translate(${tx} ${ty}) scale(${scale})`);
-  for (const node of $('map-bubbles').children) node.setAttribute('r', Number(node.dataset.radius)/scale);
+  renderBubbles();
   for (const node of $('event-marker').children) node.setAttribute('r', 9/scale);
 }
 function zoom(factor, x = 550, y = 475) {
   const next = Math.min(55, Math.max(.6, scale*factor)), ratio = next/scale;
-  tx = x-(x-tx)*ratio; ty = y-(y-ty)*ratio; scale = next; transform();
+  tx = x-(x-tx)*ratio; ty = y-(y-ty)*ratio; scale = next; transform(); scheduleViewport();
 }
 function fit(box, padding = 100) {
   if (!box) return;
@@ -33,7 +70,7 @@ $('zoom-in').addEventListener('click', () => zoom(1.5)); $('zoom-out').addEventL
 $('brazil-map').addEventListener('wheel', event => { event.preventDefault(); const p = screen(event); zoom(event.deltaY < 0 ? 1.15 : 1/1.15, p.x, p.y); }, {passive: false});
 $('brazil-map').addEventListener('pointerdown', event => { if (event.button !== 0) return; const p = screen(event); drag = {x: p.x, y: p.y, tx, ty, pointer: event.pointerId}; moved = false; });
 $('brazil-map').addEventListener('pointermove', event => { if (!drag || drag.pointer !== event.pointerId) return; const p = screen(event); if (Math.abs(p.x-drag.x)+Math.abs(p.y-drag.y) > 5) { moved = true; $('brazil-map').setPointerCapture(event.pointerId); } tx = drag.tx+p.x-drag.x; ty = drag.ty+p.y-drag.y; transform(); });
-function endDrag() { drag = null; }
+function endDrag() { if (drag && moved) scheduleViewport(); drag = null; }
 $('brazil-map').addEventListener('pointerup', endDrag); $('brazil-map').addEventListener('pointercancel', endDrag);
 $('brazil-map').addEventListener('keydown', event => {
   if (event.key === '+' || event.key === '=') zoom(1.5);
@@ -57,6 +94,7 @@ async function outlines() {
   bounds = [Math.min(...all.map(p => p[0])), Math.min(...all.map(p => p[1])), Math.max(...all.map(p => p[0])), Math.max(...all.map(p => p[1]))]; fit(bounds);
 }
 function clearResults() {
+  state.sales = null; if($('color-metric').value==='sales') $('color-metric').value='density';
   state.points = []; state.result = null; $('map-bubbles').replaceChildren(); $('event-marker').replaceChildren();
   $('location-list').replaceChildren(element('p', 'Apply filters to load matching locations.', 'field-help'));
   $('location-detail').hidden = true; $('mapped').textContent = '—'; $('result-badge').textContent = 'No search results';
@@ -111,7 +149,7 @@ function defaults() {
 }
 function count(row) { return row.estimated_count ?? row.exact_count ?? row.lower_bound; }
 function density(row) { return row.match === 'incomplete_coverage' ? null : row.density_estimate ?? row.density_lower; }
-function densityClass(value) { return value === null ? 'density-unknown' : `density-${value < 1 ? 0 : value < 5 ? 1 : value < 25 ? 2 : value < 100 ? 3 : 4}`; }
+function densityClass(value) { const limits=$('color-metric').value==='sales'?[10,50,200,1000]:$('color-metric').value==='count'?[1000,10000,50000,100000]:$('color-metric').value==='share'?[1,3,5,10]:[1,5,25,100]; return value===null?'density-unknown':`density-${value<limits[0]?0:value<limits[1]?1:value<limits[2]?2:value<limits[3]?3:4}`; }
 function interval(low, high) { return low === high && low !== null ? format(low) : `${format(low)}–${high === null ? 'unknown' : format(high)}`; }
 function details(row) {
   const panel = $('location-detail'); panel.replaceChildren(element('div', 'LOCATION DETAILS', 'eyebrow'), element('h2', row.geography.name));
@@ -137,25 +175,28 @@ function details(row) {
   panel.hidden = false;
 }
 function draw(result) {
+  state.sales=null;if($('color-metric').value==='sales')$('color-metric').value='density';
+  state.lastQuery = {integration_id: result.integration_id, ...result.query, ...result.income_filter};
+  delete state.lastQuery.minimum; delete state.lastQuery.maximum; delete state.lastQuery.metric;
+  Object.assign(state.lastQuery, {income_min: result.income_filter.minimum ?? '', income_max: result.income_filter.maximum ?? '', income_metric: result.income_filter.metric});
+  if (result.event?.id) state.lastQuery.event_id = result.event.id;
+  if (result.event && result.event.id === null) Object.assign(state.lastQuery, {venue_lat: result.event.latitude, venue_lon: result.event.longitude});
+  if (result.radius_km !== null) state.lastQuery.radius_km = result.radius_km;
+  if (result.max_travel_minutes !== null) state.lastQuery.max_travel_minutes = result.max_travel_minutes;
+
   state.result = result; state.points = result.results; $('map-bubbles').replaceChildren(); $('event-marker').replaceChildren(); $('location-detail').hidden = true;
   const maxCount = Math.max(1, ...state.points.map(count));
-  for (const row of [...state.points].sort((a,b) => count(b)-count(a))) {
-    const [cx, cy] = project(row.longitude, row.latitude), radius = 4+Math.sqrt(count(row)/maxCount)*23;
-    const node = svg('circle', {cx, cy, r: radius/scale, class: `map-bubble ${densityClass(density(row))}`, tabindex: '0', role: 'button', 'aria-label': `${row.geography.name}: cohort ${interval(row.lower_bound, row.upper_bound)}`});
-    node.dataset.radius = radius; const title = svg('title'); title.textContent = `${row.geography.name} · ${format(density(row))} aligned cohort / km²`; node.append(title);
-    node.addEventListener('click', () => { if (!moved) details(row); }); node.addEventListener('keydown', event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); details(row); } });
-    $('map-bubbles').append(node);
-  }
+  renderBubbles();
   if (result.event?.latitude !== null && result.event?.latitude !== undefined) {
     const [cx, cy] = project(result.event.longitude, result.event.latitude), pin = svg('circle', {cx, cy, r: 9/scale, class: 'event-pin'}), title = svg('title'); title.textContent = result.event.name; pin.append(title); $('event-marker').append(pin);
   }
   $('mapped').textContent = format(result.count); $('granularity').textContent = levelNames[result.query.level];
   $('map-title').textContent = `Brazil · ages ${result.query.age_min}–${result.query.age_max}`;
   $('map-subtitle').textContent = `${result.query.source_year} census → ${result.query.target_year} age alignment · ${result.event ? result.event.name : 'all selected locations'}`;
-  $('legend-title').textContent = result.query.estimate ? 'Estimated cohort / km²' : 'Confirmed cohort lower bound / km²';
   $('result-badge').textContent = `${result.count} / ${result.candidate_count} locations`;
   const c = result.coverage;
   $('coverage-note').textContent = `${result.count} mapped. ${c.missing_coordinates} eligible locations have no official seat coordinates; ${c.missing_area} mapped locations have no area. ${c.excluded_by_income} excluded by locality income; ${c.excluded_by_distance} excluded by distance. ${c.missing_income} source locations have unavailable income. No missing values are treated as zero.`;
+  if(result.max_travel_minutes!==null)$('coverage-note').textContent+=` Road extract: ${result.routing.region||'not prepared'} · ${result.routing.status}. ${c.unroutable_locations} locations have unknown road time; ${c.excluded_by_travel_time} exceed the limit. OSM car profile, no live traffic.`;
   const list = $('location-list'); list.replaceChildren();
   for (const row of [...state.points].sort((a,b) => count(b)-count(a)).slice(0, 20)) {
     const button = element('button'); button.type = 'button'; button.append(element('span', row.geography.name), element('strong', row.estimated_count !== null ? `≈ ${format(row.estimated_count)}` : interval(row.lower_bound, row.upper_bound)));
@@ -164,26 +205,44 @@ function draw(result) {
   if (!result.count) list.append(element('p', 'No mappable data matches these filters. Try a city-level source, remove the income or distance filters, or import the required geography.', 'field-help'));
   const points = state.points.map(row => project(row.longitude, row.latitude));
   if (result.event?.latitude !== null && result.event?.latitude !== undefined) points.push(project(result.event.longitude, result.event.latitude));
+  if (state.preserveView) return message(`${result.count} visible locations mapped. Viewport filtering does not change the census granularity.`);
   if (result.event && points.length) fit([Math.min(...points.map(p=>p[0])),Math.min(...points.map(p=>p[1])),Math.max(...points.map(p=>p[0])),Math.max(...points.map(p=>p[1]))], 130); else fit(bounds);
   const incomplete = state.points.filter(row => row.match === 'incomplete_coverage').length;
   message(result.count ? `${result.count} locations mapped. ${incomplete} have incomplete age coverage. Income filters select localities, not individual people. Census births, deaths and migration are not projected.` : 'No mappable observations match the selected filters. Coverage details below explain omitted locations.');
 }
-async function search() {
+async function search(viewportOnly = false) {
   if (state.busy || !$('map-form').reportValidity()) return;
   if (Number($('age-max').value) < Number($('age-min').value)) { message('To age must be greater than or equal to From age.', true); return; }
   const serial = ++state.serial; state.busy = true; $('apply').disabled = true; $('apply').textContent = 'Mapping…';
+  const box = $('viewport').checked ? currentBbox() : '';
   try {
     const result = await api.get('/api/v1/demographics/map/', {integration_id: $('integration').value, source_year: 2022,
       target_year: $('target-year').value, age_min: $('age-min').value, age_max: $('age-max').value, level: $('level').value,
-      state_code: $('state').value, event_id: $('event').value, radius_km: $('radius').disabled ? '' : $('radius').value,
+      state_code: $('state').value, event_id: $('workflow').value === 'event' ? $('event').value : '', radius_km: $('radius').disabled ? '' : $('radius').value,
       income_metric: $('income-metric').value, income_min: $('income-min').value, income_max: $('income-max').value,
-      estimate: $('estimate').checked ? 'true' : 'false'});
-    if (serial === state.serial) draw(result);
+      estimate: $('estimate').checked ? 'true' : 'false',
+      venue_lat: $('workflow').value === 'venue' ? $('venue-lat').value : '', venue_lon: $('workflow').value === 'venue' ? $('venue-lon').value : '',
+      bbox: box, max_travel_minutes: $('travel-minutes').value});
+    if (serial === state.serial) { state.preserveView = viewportOnly || !!box; draw(result); }
   } catch (error) { if (serial === state.serial) { clearResults(); message(error.message, true); } }
-  finally { state.busy = false; $('apply').disabled = !state.options; $('apply').textContent = 'Update map →'; }
+  finally { state.busy = false; $('apply').disabled = !state.options; $('apply').textContent = 'Update map →'; if(box && $('viewport').checked && box!==currentBbox()) scheduleViewport(); }
 }
 $('map-form').addEventListener('submit', event => { event.preventDefault(); search(); });
 $('target-year').addEventListener('input', ageHelp); $('event').addEventListener('change', eventChanged);
 $('integration').addEventListener('change', () => sourceChanged().catch(error => message(error.message, true)));
 $('reset').addEventListener('click', () => { defaults(); eventChanged(); clearResults(); fit(bounds); });
+$('cluster').addEventListener('change', renderBubbles);
+$('color-metric').addEventListener('change',async()=>{
+  if($('color-metric').value==='sales'){
+    try{if(!state.result?.event?.id||state.result.query.level!=='city')throw new Error('Choose an event and a city-level source before mapping uploaded ticket evidence.');
+      const body=await api.get('/api/v1/sales/summary/',{event_id:state.result.event.id});state.sales=Object.fromEntries(body.by_origin.map(row=>[row.municipality_code,row.tickets]));message('Color shows uploaded tickets; bubble size remains the census cohort. Gray means no uploaded origin record, not zero sales or zero demand. Ticket buyers are not matched to the selected age/income group.');
+    }catch(error){$('color-metric').value='density';message(error.message,true);}
+  }renderBubbles();
+});
+$('workflow').addEventListener('change', () => { const venue = $('workflow').value === 'venue'; $('venue-fields').hidden = !venue; $('event').disabled = $('workflow').value !== 'event'; if (venue) { $('radius').disabled=false; $('radius').value='100'; } else if($('workflow').value==='region'){$('radius').disabled=true;$('radius').value='';}else eventChanged(); });
+$('save-scenario').addEventListener('click', async () => {
+  if (!state.lastQuery || !state.result) return message('Apply a map search before saving a scenario.',true);
+  try { const saved=await api.send('/api/v1/analysis/scenarios/',{method:'POST',body:JSON.stringify({name:$('scenario-name').value,filters:state.lastQuery,watch:true})}); message(`Scenario ${saved.id} captured. Open Analysis workspace to compare, annotate or export.`); }
+  catch(error){message(error.message,true);}
+});
 defaults(); outlines().catch(error => message(error.message, true));

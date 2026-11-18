@@ -378,3 +378,87 @@ class DataCoverage(models.Model):
     status = models.CharField(max_length=30)
     record_count = models.PositiveIntegerField(default=0)
     message = models.CharField(max_length=250)
+
+
+class SalesUpload(models.Model):
+    owner = models.ForeignKey(ApiUser, on_delete=models.PROTECT)
+    event = models.ForeignKey(Event, on_delete=models.PROTECT)
+    edition = models.CharField(max_length=80)
+    sha256 = models.CharField(max_length=64)
+    row_count = models.PositiveIntegerField()
+    created_at = models.DateTimeField(default=django_timezone.now)
+    counts = models.JSONField(default=dict)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=['owner', 'event', 'edition', 'sha256'], name='unique_sales_upload')]
+
+
+class Sale(models.Model):
+    owner = models.ForeignKey(ApiUser, on_delete=models.PROTECT)
+    event = models.ForeignKey(Event, on_delete=models.PROTECT)
+    edition = models.CharField(max_length=80)
+    external_id = models.CharField(max_length=100)
+    sold_on = models.DateField(db_index=True)
+    municipality_code = models.CharField(max_length=7, blank=True, db_index=True)
+    geography = models.ForeignKey(Geography, on_delete=models.PROTECT, null=True)
+    tickets = models.PositiveIntegerField()
+    revenue = models.DecimalField(max_digits=18, decimal_places=2)
+    version = models.PositiveIntegerField(default=1)
+    fingerprint = models.CharField(max_length=64)
+    last_upload = models.ForeignKey(SalesUpload, on_delete=models.PROTECT)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=['owner', 'event', 'edition', 'external_id'], name='unique_owned_sale'),
+                       models.CheckConstraint(condition=models.Q(revenue__gte=0), name='nonnegative_sale_revenue')]
+        indexes = [models.Index(fields=['owner', 'event', 'edition'], name='sale_owned_event_edition')]
+
+
+class SaleVersion(models.Model):
+    sale = models.ForeignKey(Sale, on_delete=models.PROTECT)
+    upload = models.ForeignKey(SalesUpload, on_delete=models.PROTECT)
+    version = models.PositiveIntegerField()
+    snapshot = models.JSONField()
+    created_at = models.DateTimeField(default=django_timezone.now)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=['sale', 'version'], name='unique_sale_version')]
+
+
+class AnalysisScenario(models.Model):
+    owner = models.ForeignKey(ApiUser, on_delete=models.PROTECT)
+    name = models.CharField(max_length=120)
+    filters = models.JSONField(default=dict)
+    revision = models.PositiveIntegerField(default=1)
+    watch = models.BooleanField(default=False)
+    deleted_at = models.DateTimeField(null=True)
+    created_at = models.DateTimeField(default=django_timezone.now)
+    updated_at = models.DateTimeField(default=django_timezone.now)
+
+
+class ScenarioSnapshot(models.Model):
+    scenario = models.ForeignKey(AnalysisScenario, on_delete=models.PROTECT)
+    scenario_revision = models.PositiveIntegerField()
+    filters = models.JSONField()
+    result = models.JSONField()
+    source_signature = models.CharField(max_length=64)
+    created_at = models.DateTimeField(default=django_timezone.now)
+
+
+class AnalysisNote(models.Model):
+    owner = models.ForeignKey(ApiUser, on_delete=models.PROTECT)
+    scenario = models.ForeignKey(AnalysisScenario, null=True, on_delete=models.PROTECT)
+    geography = models.ForeignKey(Geography, null=True, on_delete=models.PROTECT)
+    text = models.TextField()
+    created_at = models.DateTimeField(default=django_timezone.now)
+    updated_at = models.DateTimeField(default=django_timezone.now)
+
+
+class AnalysisAlert(models.Model):
+    scenario = models.ForeignKey(AnalysisScenario, on_delete=models.PROTECT)
+    source_signature = models.CharField(max_length=64)
+    message = models.CharField(max_length=250)
+    read_at = models.DateTimeField(null=True)
+    created_at = models.DateTimeField(default=django_timezone.now)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=['scenario', 'source_signature'], name='unique_scenario_source_alert')]

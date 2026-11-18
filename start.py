@@ -81,10 +81,13 @@ def read_jsonc(path):
 def load_config(path):
     data = read_jsonc(path)
     try:
-        if set(data) - {"database", "api", "auth", "docker", "frontend", "audience_map"} or {"database", "api", "auth", "docker"} - data.keys():
+        if set(data) - {"database", "api", "auth", "docker", "frontend", "audience_map", "routing"} or {"database", "api", "auth", "docker"} - data.keys():
             raise ValueError()
         data.setdefault('frontend', {'port': 8011})
         data.setdefault('audience_map', {'port': 8012})
+        data.setdefault('routing', {'enabled': False, 'region': 'rio-de-janeiro'})
+        if set(data['routing']) != {'enabled','region'} or type(data['routing']['enabled']) is not bool or data['routing']['region'] not in ('rio-de-janeiro','sudeste','brazil'):
+            raise ValueError()
         if (
             set(data["database"]) != {"name", "port"}
             or set(data["api"]) != {"port"}
@@ -190,6 +193,8 @@ def compose_environment(config, state_dir, state):
             "API_PORT": str(config["api"]["port"]),
             "FRONTEND_PORT": str(config['frontend']['port']),
             "AUDIENCE_MAP_PORT": str(config['audience_map']['port']),
+            "ROUTING_DATA_DIR": (ROOT/'routing/data'/config['routing']['region']).as_posix(),
+            "ROUTING_ENABLED": 'true' if config['routing']['enabled'] else 'false',
             "API_TOKEN_TTL_SECONDS": str(config["auth"]["token_ttl_seconds"]),
             "API_CLIENT_ID": state["client_id"],
             "ROTATE_INITIAL_CLIENT": (
@@ -231,6 +236,7 @@ def main(argv=None):
         action="store_true",
         help="Configure the Sympla provider token without changing API client credentials",
     )
+    actions.add_argument('--prepare-routing',action='store_true',help='Download and prepare the configured local road extract before startup')
     args = parser.parse_args(argv)
     try:
         config = load_config(args.config)
@@ -344,18 +350,21 @@ def main(argv=None):
         write_file(state_path, json.dumps(state, indent=2))
         env = compose_environment(config, state_dir, state)
         env["CONFIGURE_MASTER_PROVIDER"] = "true" if args.configure_sympla else "false"
+        if args.prepare_routing:
+            run([sys.executable,str(ROOT/'routing/prepare.py'),'--region',config['routing']['region']],env)
         if args.stop:
-            run(base + ["stop"], env)
+            run(base + ["--profile", "routing", "stop"], env)
             print("Containers stopped. Database volume and credentials were preserved.")
             return 0
         if args.logs:
-            run(base + ["logs", "--follow", "api", "integration-sympla", "integration-ibge", "frontend", "audience-map"], env)
+            run(base + ["logs", "--follow", "api", "integration-sympla", "integration-ibge", "frontend", "audience-map", "analysis-monitor"], env)
             return 0
+        (ROOT/'routing/data'/config['routing']['region']).mkdir(parents=True,exist_ok=True)
         print("Building the application and starting PostgreSQL...")
-        run(base + ["build", "api", "integration-sympla", "integration-ibge", "frontend", "audience-map"], env)
+        run(base + ["build", "api", "integration-sympla", "integration-ibge", "frontend", "audience-map", "analysis-monitor"], env)
         run(base + ["up", "--detach", "--wait", "db"], env)
         # Do not let a previous application version write during ownership/schema migrations.
-        run(base + ["stop", "api", "worker", "integration-sympla", "integration-ibge", "frontend", "audience-map"], env)
+        run(base + ["stop", "api", "worker", "integration-sympla", "integration-ibge", "frontend", "audience-map", "analysis-monitor"], env)
         run(base + ["rm", "--force", "worker"], env)
         run(base + ["run", "--rm", "--no-deps", "bootstrap"], env)
         # The API client secret is only needed to create/rotate its password hash.
@@ -366,7 +375,15 @@ def main(argv=None):
         app_up = ["up", "--detach", "--wait"]
         if args.configure_sympla:
             app_up.append("--force-recreate")
-        run(base + app_up + ["api", "integration-sympla", "integration-ibge", "frontend", "audience-map"], env)
+        services=["api", "integration-sympla", "integration-ibge", "frontend", "audience-map", "analysis-monitor"]
+        if config['routing']['enabled'] and (ROOT/'routing/data'/config['routing']['region']/'manifest.json').exists():
+            services.append('routing')
+        run(base + app_up + services, env)
+        if config['routing']['enabled']:
+            if (ROOT/'routing/data'/config['routing']['region']/'manifest.json').exists():
+                run(base + ['up','--detach','routing'],env)
+            else:
+                print('Routing is not prepared. Run python routing/prepare.py --region '+config['routing']['region']+' and restart start.py.')
         print(f"Frontend: http://127.0.0.1:{config['frontend']['port']}/")
         print(f"Audience map: http://127.0.0.1:{config['audience_map']['port']}/map/")
         print(f"Ready. Swagger: http://127.0.0.1:{config ['api']['port']}/docs/")

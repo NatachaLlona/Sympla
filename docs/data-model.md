@@ -393,3 +393,25 @@ erDiagram
 Spatial metadata is shared by geography, level and reference year. Owned statistical values remain
 in `STATISTIC`; the read-only [audience map](audience-map.md) joins them without copying or rewriting
 observations. Paired-coordinate and positive-area constraints apply at database level.
+
+## Sales and analysis evidence
+
+```mermaid
+erDiagram
+    API_ACCOUNT ||--o{ SALES_UPLOAD : owns
+    EVENT ||--o{ SALES_UPLOAD : receives
+    SALES_UPLOAD ||--o{ SALE_VERSION : sources
+    API_ACCOUNT ||--o{ SALE : owns
+    EVENT ||--o{ SALE : records
+    GEOGRAPHY o|--o{ SALE : resolves_origin
+    SALE ||--o{ SALE_VERSION : versions
+    API_ACCOUNT ||--o{ ANALYSIS_SCENARIO : owns
+    ANALYSIS_SCENARIO ||--o{ SCENARIO_SNAPSHOT : captures
+    ANALYSIS_SCENARIO o|--o{ ANALYSIS_NOTE : annotates
+    GEOGRAPHY o|--o{ ANALYSIS_NOTE : locates
+    ANALYSIS_SCENARIO ||--o{ ANALYSIS_ALERT : watches
+```
+
+Sales identity is unique by API account, event, edition and source line ID. Upload identity additionally
+uses file SHA-256. Sale versions and scenario snapshots are immutable. Scenario archival preserves its
+snapshots; alerts are deduplicated by scenario and source signature. See [analysis semantics](analysis-workspace.md).

@@ -12,6 +12,7 @@
     <p class="sidebar-label">WORKSPACE</p>
     <a class="nav-item" href="/explorer/"><span aria-hidden="true">▦</span> Demographic explorer</a>
     <a class="nav-item active" href="/map/" aria-current="page"><span aria-hidden="true">◎</span> Audience map</a>
+    <a class="nav-item" href="/map/workspace.html"><span aria-hidden="true">▤</span> Analysis workspace</a>
     <a class="nav-item" href="/docs/" target="_blank" rel="noopener"><span aria-hidden="true">↗</span> API documentation</a>
     <div class="sidebar-bottom"><span class="source-dot"></span><div>Official IBGE data<small>Census 2022 · Brazil</small></div></div>
   </aside>
@@ -24,9 +25,12 @@
         <form id="map-form" class="filters" aria-label="Audience map filters">
           <div class="filter-header"><h2>Find your audience</h2><button type="button" class="text-button" id="reset">Reset</button></div>
           <fieldset><legend><span class="step">01</span> Event &amp; reach</legend>
+            <label>Analysis workflow<select id="workflow"><option value="event">Analyze an event</option><option value="venue">Compare proposed venues</option><option value="region">Explore a region</option></select></label>
             <label>Event<select id="event"><option value="">All locations · no event</option></select></label>
             <label>Distance from event<select id="radius" disabled><option value="">Nationwide</option><option value="25">Within 25 km</option><option value="50">Within 50 km</option><option value="100">Within 100 km</option><option value="250">Within 250 km</option><option value="500">Within 500 km</option></select></label>
             <p class="field-help" id="event-help">Straight-line distance to each administrative seat. Event access requires events:read.</p>
+            <label>Maximum driving time<select id="travel-minutes"><option value="">No road-time filter</option><option value="30">30 minutes</option><option value="60">60 minutes</option><option value="120">120 minutes</option><option value="240">240 minutes</option></select></label><p class="field-help">Local OSRM car profile; no live traffic. Only the prepared road extract is covered. Unroutable locations remain unknown, never zero minutes.</p>
+            <div id="venue-fields" hidden><div class="input-row"><label>Venue latitude<input id="venue-lat" type="number" min="-90" max="90" step="any" placeholder="-23.55"></label><label>Venue longitude<input id="venue-lon" type="number" min="-180" max="180" step="any" placeholder="-46.63"></label></div><p class="field-help">Save each venue as a scenario and compare its captured results in the workspace.</p></div>
           </fieldset>
           <fieldset><legend><span class="step">02</span> Census cohort</legend>
             <div class="input-row"><label>From age<input id="age-min" type="number" min="0" max="130" required></label><span class="input-separator">–</span><label>To age<input id="age-max" type="number" min="0" max="130" required></label></div>
@@ -46,13 +50,19 @@
             <p class="field-help">Only locations with official coordinates can be drawn. Zoom changes the view, not the data level.</p>
           </fieldset>
           <button type="submit" id="apply" class="button button-primary" disabled>Update map →</button>
+          <label class="check-label"><input type="checkbox" id="cluster" checked><span>Group overlapping bubbles</span></label>
+          <label class="check-label"><input type="checkbox" id="viewport"><span>Load visible area only</span></label>
+          <label>Color bubbles by<select id="color-metric"><option value="density">Cohort density / km²</option><option value="count">Cohort count</option><option value="share">Share of source age population</option><option value="sales">Uploaded tickets by municipality</option></select></label>
+          <label>Scenario name<input id="scenario-name" type="text" maxlength="120" placeholder="Campaign audience"></label>
+          <button type="button" id="save-scenario" class="button button-secondary">Save current scenario</button>
+          <p class="field-help">Scenario captures preserve filters and source versions; require scenarios:write.</p>
         </form>
         <section class="map-results" aria-label="Population density map">
           <div class="map-metrics"><article><span>Mapped locations</span><strong id="mapped">—</strong></article><article><span>Reference alignment</span><strong id="alignment">2022 → 2026</strong></article><article><span>Geography level</span><strong id="granularity">Municipalities</strong></article></div>
           <section class="map-card">
             <header class="map-heading"><div><span class="eyebrow">AUDIENCE DISTRIBUTION</span><h2 id="map-title">Brazil · census cohort density</h2><p id="map-subtitle">Choose filters to see the imported data.</p></div><span id="result-badge" class="map-badge">Not connected</span></header>
             <div class="map-canvas" id="map-canvas">
-              <svg id="brazil-map" viewBox="0 0 1100 950" role="img" aria-label="Interactive Brazil map. Use zoom buttons, arrow keys to pan, or select a location below." tabindex="0"><title>Brazil audience map</title><g id="map-world"><g id="state-outlines"></g><g id="map-bubbles"></g><g id="event-marker"></g></g></svg>
+              <svg id="brazil-map" viewBox="0 0 1100 950" role="group" aria-label="Interactive Brazil map. Use zoom buttons, arrow keys to pan, or select a location below." tabindex="0"><title>Brazil audience map</title><g id="map-world"><g id="state-outlines"></g><g id="map-bubbles"></g><g id="event-marker"></g></g></svg>
               <div class="map-controls"><button type="button" id="zoom-in" aria-label="Zoom in">+</button><button type="button" id="zoom-out" aria-label="Zoom out">−</button><button type="button" id="fit-brazil" aria-label="Fit Brazil">⌂</button></div>
               <div class="map-hint">Drag to pan · scroll to zoom · click a bubble</div>
               <div class="map-legend"><strong id="legend-title">Aligned cohort / km²</strong><div class="legend-colors"><span class="density-0"></span><span class="density-1"></span><span class="density-2"></span><span class="density-3"></span><span class="density-4"></span></div><div class="legend-ticks"><span>&lt;1</span><span>1–5</span><span>5–25</span><span>25–100</span><span>100+</span></div><small>Bubble area: cohort count · gray: incomplete data</small></div>
@@ -65,7 +75,7 @@
           <section class="method-note"><span aria-hidden="true">ⓘ</span><div><strong>Census alignment, not a population forecast.</strong><p>Age groups advance by analysis year minus 2022. Births after the census, deaths and migration are not modeled. Partial bands use bounds unless an explicit estimate is enabled. Income remains a separate locality-level measure.</p></div></section>
         </section>
       </div>
-      <footer>IBGE Census 2022 <span>·</span> Owner-scoped event and demographic data <span>·</span> <a href="/explorer/">Open demographic explorer ↗</a></footer>
+      <footer>IBGE Census 2022 <span>·</span> <a href="/map/workspace.html">Analysis workspace ↗</a> <span>·</span> <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">Road data © OpenStreetMap contributors · ODbL</a></footer>
     </main>
   </div>
   <dialog id="auth-dialog" class="auth-dialog"><div class="dialog-heading"><div><h2>Authorize through Swagger</h2><p>Use your existing API client ID and secret in Authorize.</p></div><button id="close-auth" class="icon-button" aria-label="Close authorization">×</button></div><iframe id="auth-frame" title="Swagger API authorization" sandbox="allow-scripts allow-same-origin allow-forms"></iframe></dialog>

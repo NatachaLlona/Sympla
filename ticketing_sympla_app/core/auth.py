@@ -21,7 +21,9 @@ def api_endpoint(methods, *, section, action=None):
             actor = ""
             owner_identifier = None
             with transaction.atomic():
-                Coordinator.objects.select_for_update().get(pk=1)
+                # Read-only searches must not serialize behind the global import/write coordinator.
+                if request.method != 'GET':
+                    Coordinator.objects.select_for_update().get(pk=1)
                 header = request.headers.get("Authorization", "")
                 api_account = None
                 if header.startswith("Bearer ") and len(header) <= 256:
@@ -30,8 +32,9 @@ def api_endpoint(methods, *, section, action=None):
                         token_hash=digest, expires_at__gt=timezone.now()
                     ).first()
                     if token:
+                        accounts = ApiUser.objects if request.method == 'GET' else ApiUser.objects.select_for_update()
                         api_account = (
-                            ApiUser.objects.select_for_update()
+                            accounts
                             .filter(
                                 pk=token.api_account_id,
                                 is_active=True,

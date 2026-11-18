@@ -147,7 +147,7 @@ def search(request):
     return JsonResponse(search_data(request))
 
 
-def search_data(request, *, all_results=False):
+def search_data(request, *, all_results=False, geography_ids=None):
     params = parameters(request)
     query = available_statistics(request.api_user).filter(period=str(params['source_year']))
     integration_id = request.GET.get('integration_id')
@@ -160,10 +160,22 @@ def search_data(request, *, all_results=False):
             raise ApiProblem('integration_required', 'Choose an integration_id to avoid combining duplicate sources.')
         integration_id = available[0] if available else None
     query = query.filter(geography__level=params['level'])
+    if geography_ids is not None:
+        query = query.filter(geography_id__in=geography_ids)
     if params['state_code']:
         query = query.filter(geography__code__startswith=params['state_code'])
     if params['city_code']:
         query = query.filter(geography__code=params['city_code']) if params['level'] == 'city' else query.filter(geography__parent__code=params['city_code'])
+    from django.core.cache import cache
+    from django.db.models import Count, Max, Sum
+    import hashlib
+    import json
+    stamp = query.aggregate(count=Count('pk'), latest=Max('last_seen_at'), versions=Sum('version'))
+    cache_key = 'cohorts-v2:'+hashlib.sha256(json.dumps([str(request.api_user.pk), request.api_user.credential_version,
+        params, sorted(request.GET.items()), all_results, sorted(geography_ids) if geography_ids is not None else None, stamp], default=str).encode()).hexdigest()
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return cached
     rows = list(query.select_related('category', 'geography__parent').order_by('geography_id', 'category_id')[:100001])
     if len(rows) > 100000:
         raise ApiProblem('search_scope_limit', 'Narrow the search to a state or municipality.', 400)
@@ -197,4 +209,5 @@ def search_data(request, *, all_results=False):
         'results': results if all_results else results[start:start+size]}
     if not results:
         response['empty_reason'] = 'No imported age data matches this scope. Official neighborhoods may be unavailable; districts are a separate level.'
+    cache.set(cache_key, response, 120)
     return response

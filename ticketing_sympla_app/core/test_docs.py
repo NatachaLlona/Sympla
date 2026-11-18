@@ -53,6 +53,7 @@ class DocumentationTests(SimpleTestCase):
                 .replace("{run_id}", "00000000-0000-0000-0000-000000000001")
                 .replace("{identifier}", "00000000-0000-0000-0000-000000000001")
             )
+            actual_path = actual_path.replace('{pk}', '1')
             self.assertIsNotNone(resolve(actual_path))
         self.assertEqual(
             spec["paths"]["/api/v1/sync/"]["post"]["requestBody"]["content"][

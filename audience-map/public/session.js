@@ -26,13 +26,19 @@ export function apiSession(onConnect, onDisconnect) {
   });
   setInterval(() => { if (token && Date.now() >= expires) disconnect(); }, 15000);
   async function get(path, parameters = {}) {
-    if (!token || Date.now() >= expires) { disconnect(); throw new Error('Authorize through Swagger to search.'); }
-    const url = new URL(path, location.origin), current = generation;
+    const url = new URL(path, location.origin);
     for (const [key, value] of Object.entries(parameters)) if (value !== '' && value !== null && value !== undefined) url.searchParams.set(key, value);
-    const response = await fetch(url, {headers: {Authorization: `Bearer ${token}`}, credentials: 'omit', cache: 'no-store'});
+    return send(url);
+  }
+  async function send(path, init = {}) {
+    if (!token || Date.now() >= expires) { disconnect(); throw new Error('Authorize through Swagger to search.'); }
+    const current = generation;
+    const headers = {Authorization: `Bearer ${token}`};
+    if (init.body && !(init.body instanceof FormData)) headers['Content-Type'] = 'application/json';
+    const response = await fetch(path, {...init, headers, credentials: 'omit', cache: 'no-store'});
     if (current !== generation) throw new Error('The API session changed.');
     if (response.status === 401) { disconnect(); throw new Error('The API session expired. Authorize again.'); }
-    const body = await response.json();
+    const body = response.headers.get('Content-Type')?.includes('application/json') ? await response.json() : await response.text();
     if (!response.ok) throw new Error(body.message || (response.status === 403 ? `This API account needs ${body.required_permission || 'read'} permission.` : body.error || 'API request failed.'));
     return body;
   }
@@ -44,5 +50,5 @@ export function apiSession(onConnect, onDisconnect) {
     }
     throw new Error('Narrow the selected source.');
   }
-  return {get, pages};
+  return {get, pages, send};
 }

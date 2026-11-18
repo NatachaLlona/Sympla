@@ -453,3 +453,5 @@ from .cohort_schema import extend as extend_cohorts
 extend_cohorts(SCHEMA)
 from .map_schema import extend as extend_map
 extend_map(SCHEMA)
+from .analysis_schema import extend as extend_analysis
+extend_analysis(SCHEMA)

@@ -10,3 +10,4 @@ venv/
 *.log
 .local/
 .qa-local/
+routing/data/

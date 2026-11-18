@@ -45,6 +45,8 @@ if os.getenv('DJANGO_TRUST_PROXY', 'false').lower() == 'true':
     # Only enable behind a trusted proxy that strips untrusted forwarding headers.
     SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 DATA_UPLOAD_MAX_MEMORY_SIZE = 4096
+CACHES = {'default': {'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+    'LOCATION': 'owned-cohort-results', 'TIMEOUT': 120, 'OPTIONS': {'MAX_ENTRIES': 32, 'CULL_FREQUENCY': 2}}}
 DOCS_ENABLED = os.getenv('DJANGO_DOCS_ENABLED', 'true').lower() == 'true'
 API_TOKEN_TTL_SECONDS = int(os.getenv('API_TOKEN_TTL_SECONDS', '3600'))
 if not 60 <= API_TOKEN_TTL_SECONDS <= 86400:

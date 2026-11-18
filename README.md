@@ -1,6 +1,8 @@
 # Sympla Integration
 
 Independent [audience map module](docs/audience-map.md): `http://127.0.0.1:8012/map/`.
+The [analysis workspace](docs/analysis-workspace.md) is available at `http://127.0.0.1:8012/map/workspace.html`:
+sales CSV uploads, saved scenarios, comparisons, reports, quality and local source-update alerts.
 Filter owned events, age cohorts and locality income, then inspect official IBGE density bubbles
 with zoom, source provenance and explicit geography coverage.
 

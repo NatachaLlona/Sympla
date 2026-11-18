@@ -18,6 +18,7 @@ x-app: &app
     DB_PASSWORD_FILE: /run/secrets/db_password
     DB_SSLMODE: disable
     API_TOKEN_TTL_SECONDS: ${API_TOKEN_TTL_SECONDS:-3600}
+    ROUTING_ENABLED: ${ROUTING_ENABLED:-false}
     PROVIDER_ENCRYPTION_KEY_FILE: /run/secrets/provider_encryption_key
     SYMPLA_API_HOST: https://api.sympla.com.br/public/v1.6.0
   secrets: [django_secret, db_password, provider_encryption_key]
@@ -26,8 +27,33 @@ x-app: &app
   read_only: true
   tmpfs: [/tmp]
   restart: unless-stopped
+  volumes: ['${ROUTING_DATA_DIR}:/routing-data:ro']
 
 services:
+  routing:
+    image: ghcr.io/project-osrm/osrm-backend@sha256:e1929ae2818226284d7ef007329098a30851c11528ab3712bc9c8d68da78278b
+    profiles: [routing]
+    command: [osrm-routed, --algorithm, mld, --max-table-size, '101', /data/region.osrm]
+    volumes: ['${ROUTING_DATA_DIR}:/data:ro']
+    read_only: true
+    tmpfs: [/tmp]
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+    restart: unless-stopped
+  analysis-monitor:
+    <<: *app
+    command: [python, manage.py, analysis_monitor]
+    environment:
+      <<: *app-env
+      PROVIDER_ENCRYPTION_KEY_FILE: ''
+    secrets: [django_secret, db_password]
+    depends_on:
+      db: {condition: service_healthy}
+    healthcheck:
+      test: [CMD, python, -c, "import os,time; assert time.time()-os.path.getmtime('/tmp/analysis-heartbeat') < 90"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
   audience-map:
     build: {context: ., dockerfile: audience-map/Dockerfile}
     image: ${COMPOSE_PROJECT_NAME:-sympla}-audience-map
@@ -61,7 +87,7 @@ services:
       timeout: 5s
       retries: 12
   db:
-    image: postgres:17-alpine
+    image: postgis/postgis:17-3.7-alpine
     environment:
       POSTGRES_DB: ${DB_NAME}
       POSTGRES_USER: sympla_admin

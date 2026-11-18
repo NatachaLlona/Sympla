@@ -110,6 +110,8 @@ def main():
     public = ROOT/'audience-map/public/data'
     public.mkdir(exist_ok=True)
     (public/'brazil-states-2022.geojson').write_text(json.dumps({'type': 'FeatureCollection', 'source': states_source, 'features': features}, ensure_ascii=False, separators=(',', ':')), encoding='utf-8')
+    (ROOT/'ticketing_sympla_app/core/integration_modules/ibge/report_states_2022.geojson').write_bytes((public/'brazil-states-2022.geojson').read_bytes())
+    (ROOT/'ticketing_sympla_app/core/integration_modules/ibge/report_states_2022.geojson').write_bytes((public/'brazil-states-2022.geojson').read_bytes())
     target = ROOT/'ticketing_sympla_app/core/integration_modules/ibge/map_reference_2022.json'
     target.write_text(json.dumps({'reference_year': 2022, 'sources': provenance, 'locations': coordinates}, ensure_ascii=False, separators=(',', ':')), encoding='utf-8')
     print(f'Built {len(features)} state outlines and {len(coordinates)} spatial references; {sum("latitude" in item for item in coordinates.values())} official seats.')
